@@ -8,16 +8,20 @@ Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Extends the WordPress MCP Adapter to expose Elementor data, widgets, and page design tools as MCP tools for AI agents.
+Extends the WordPress MCP Adapter to expose Elementor data, widgets, page lookup, page duplication, and page design tools as MCP tools for AI agents.
 
 == Description ==
 
-MCP Tools for Elementor bridges the gap between AI tools and Elementor page design. It extends the official WordPress MCP Adapter to expose 92 MCP (Model Context Protocol) tools that let AI agents like Claude, Cursor, and other MCP-compatible clients create and manipulate Elementor page designs programmatically.
+MCP Tools for Elementor bridges the gap between AI tools and Elementor page design. It extends the official WordPress MCP Adapter to expose 106 MCP (Model Context Protocol) tools that let AI agents like Claude, Cursor, and other MCP-compatible clients create and manipulate Elementor page designs programmatically.
 
 **Key Features:**
 
+* **Page Lookup** — Resolve Elementor-built pages by post ID or slug and return compact IDs or rich page payloads.
+* **Page Duplication** — Duplicate Elementor-built pages/posts/CPTs with copied post fields, taxonomies, post meta, and refreshed Elementor CSS.
+* **Companion CLI** — Run `@elementor-mcp/cli` in endpoint mode for portable MCP setup or in REST fallback mode for page/file workflows.
+
 * **Query & Discovery** — List widgets, inspect page structures, read element settings, browse templates, and view global design tokens.
-* **Page Management** — Create pages, update page settings, clear content, import/export templates.
+* **Page Management** — Create pages, duplicate Elementor pages, update page settings, clear content, import/export templates.
 * **Layout Tools** — Add flexbox containers, move/remove/duplicate elements.
 * **Widget Tools** — 41 widget tools: universal add/update for any widget, plus 23 free convenience shortcuts and 16 conditional Pro widget tools.
 * **Pro Widget Support** — Conditional tools for Elementor Pro widgets (form, posts grid, countdown, price table, flip box, animated headline, call to action, slides, testimonial carousel, price list, gallery, share buttons, table of contents, blockquote, Lottie, hotspot) that only register when Pro is active.
@@ -42,6 +46,7 @@ MCP Tools for Elementor bridges the gap between AI tools and Elementor page desi
 * WP-CLI stdio (recommended for local development)
 * Node.js HTTP proxy (for remote sites)
 * Direct HTTP (for VS Code MCP extension)
+* Companion CLI package (`@elementor-mcp/cli`) for endpoint or REST fallback workflows
 
 == Installation ==
 
@@ -121,6 +126,20 @@ Replace `localhost:10003` with your local WordPress address and `BASE64_ENCODED_
   }
 }
 `
+
+== Companion CLI Connection ==
+
+Run the companion CLI package:
+
+`
+npx @elementor-mcp/cli \
+  --mode=endpoint \
+  --wp-url=https://your-site.com \
+  --wp-username=admin \
+  --wp-app-password="xxxx xxxx xxxx xxxx xxxx xxxx"
+`
+
+Switch `--mode=rest` to use the limited WordPress REST fallback server for page/file workflows such as `get_page`, `get_page_by_slug`, `duplicate_page`, `download_page_to_file`, and `update_page_from_file`.
 
 == Frequently Asked Questions ==
 

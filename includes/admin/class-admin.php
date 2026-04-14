@@ -353,6 +353,21 @@ class Elementor_MCP_Admin {
 						'description' => __( 'Lists all pages/posts that use Elementor.', 'elementor-mcp' ),
 						'badges'      => array( 'read-only' ),
 					),
+					'elementor-mcp/get-page'            => array(
+						'label'       => __( 'Get Page', 'elementor-mcp' ),
+						'description' => __( 'Returns a rich page payload for one Elementor-built page by post ID.', 'elementor-mcp' ),
+						'badges'      => array( 'read-only' ),
+					),
+					'elementor-mcp/get-page-by-slug'    => array(
+						'label'       => __( 'Get Page By Slug', 'elementor-mcp' ),
+						'description' => __( 'Finds an Elementor-built page by slug and returns its metadata, settings, and element tree.', 'elementor-mcp' ),
+						'badges'      => array( 'read-only' ),
+					),
+					'elementor-mcp/get-page-id-by-slug' => array(
+						'label'       => __( 'Get Page ID By Slug', 'elementor-mcp' ),
+						'description' => __( 'Resolves a slug to a compact Elementor page identifier payload.', 'elementor-mcp' ),
+						'badges'      => array( 'read-only' ),
+					),
 					'elementor-mcp/list-templates'       => array(
 						'label'       => __( 'List Templates', 'elementor-mcp' ),
 						'description' => __( 'Lists all saved Elementor templates.', 'elementor-mcp' ),
@@ -371,6 +386,21 @@ class Elementor_MCP_Admin {
 					'elementor-mcp/create-page'          => array(
 						'label'       => __( 'Create Page', 'elementor-mcp' ),
 						'description' => __( 'Creates a new WordPress page with Elementor enabled.', 'elementor-mcp' ),
+						'badges'      => array(),
+					),
+					'elementor-mcp/duplicate-page'       => array(
+						'label'       => __( 'Duplicate Page', 'elementor-mcp' ),
+						'description' => __( 'Duplicates an Elementor-built page/post/CPT including core fields, taxonomies, post meta, and refreshed Elementor CSS.', 'elementor-mcp' ),
+						'badges'      => array(),
+					),
+					'elementor-mcp/update-page-post'     => array(
+						'label'       => __( 'Update Page Post Fields', 'elementor-mcp' ),
+						'description' => __( 'Updates core WordPress post fields like title, slug, status, excerpt, featured image, template, and menu order.', 'elementor-mcp' ),
+						'badges'      => array(),
+					),
+					'elementor-mcp/update-page-meta'     => array(
+						'label'       => __( 'Update Page Meta', 'elementor-mcp' ),
+						'description' => __( 'Updates safe custom post meta while blocking Elementor-owned internals.', 'elementor-mcp' ),
 						'badges'      => array(),
 					),
 					'elementor-mcp/update-page-settings' => array(

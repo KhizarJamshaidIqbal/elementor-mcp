@@ -1,0 +1,33 @@
+runtime: "typescript"
+
+startCommand:
+  type: "stdio"
+  configSchema:
+    type: "object"
+    properties:
+      wpUrl:
+        type: "string"
+        description: "WordPress site URL."
+      wpUsername:
+        type: "string"
+        description: "WordPress username that owns the application password."
+      wpAppPassword:
+        type: "string"
+        description: "WordPress application password."
+      mode:
+        type: "string"
+        enum: ["endpoint", "rest"]
+        default: "endpoint"
+        description: "Use endpoint mode for the plugin MCP bridge, or rest mode for the WordPress REST fallback."
+    required: ["wpUrl", "wpUsername", "wpAppPassword"]
+  commandFunction: |-
+    (config) => ({
+      command: "node",
+      args: [
+        "src/index.mjs",
+        `--wp-url=${config.wpUrl}`,
+        `--wp-username=${config.wpUsername}`,
+        `--wp-app-password=${config.wpAppPassword}`,
+        `--mode=${config.mode || "endpoint"}`
+      ]
+    })

@@ -1,0 +1,24 @@
+{
+  "name": "@elementor-mcp/cli",
+  "version": "0.1.0",
+  "description": "Companion CLI for MCP Tools for Elementor with endpoint proxy mode and WordPress REST fallback mode.",
+  "type": "module",
+  "bin": {
+    "elementor-mcp-cli": "./src/index.mjs"
+  },
+  "scripts": {
+    "start": "node src/index.mjs",
+    "start:rest": "node src/index.mjs --mode=rest",
+    "dev": "node src/index.mjs --mode=endpoint"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "mcp",
+    "elementor",
+    "wordpress",
+    "model-context-protocol"
+  ],
+  "license": "GPL-2.0-or-later"
+}

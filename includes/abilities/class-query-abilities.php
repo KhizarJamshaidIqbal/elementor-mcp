@@ -2,8 +2,8 @@
 /**
  * Read-only query/discovery MCP abilities for Elementor.
  *
- * Registers 7 read-only tools that let AI agents discover widgets,
- * inspect page structures, and read Elementor data.
+ * Registers read-only tools that let AI agents discover widgets,
+ * inspect page structures, resolve pages, and read Elementor data.
  *
  * @package Elementor_MCP
  * @since   1.0.0
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Registers and implements the 7 read-only query abilities.
+ * Registers and implements the read-only query abilities.
  *
  * @since 1.0.0
  */
@@ -63,6 +63,9 @@ class Elementor_MCP_Query_Abilities {
 			'elementor-mcp/get-element-settings',
 			'elementor-mcp/find-element',
 			'elementor-mcp/list-pages',
+			'elementor-mcp/get-page',
+			'elementor-mcp/get-page-by-slug',
+			'elementor-mcp/get-page-id-by-slug',
 			'elementor-mcp/list-templates',
 			'elementor-mcp/get-global-settings',
 		);
@@ -83,6 +86,9 @@ class Elementor_MCP_Query_Abilities {
 		$this->register_get_element_settings();
 		$this->register_find_element();
 		$this->register_list_pages();
+		$this->register_get_page();
+		$this->register_get_page_by_slug();
+		$this->register_get_page_id_by_slug();
 		$this->register_list_templates();
 		$this->register_get_global_settings();
 	}
@@ -832,6 +838,76 @@ class Elementor_MCP_Query_Abilities {
 	}
 
 	/**
+	 * Returns the JSON Schema for a featured image payload.
+	 *
+	 * @since 1.4.4
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function get_featured_image_schema(): array {
+		return array(
+			'type'       => 'object',
+			'properties' => array(
+				'id'  => array( 'type' => 'integer' ),
+				'url' => array( 'type' => 'string' ),
+				'alt' => array( 'type' => 'string' ),
+			),
+		);
+	}
+
+	/**
+	 * Returns the JSON Schema for rich page lookup responses.
+	 *
+	 * @since 1.4.4
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function get_rich_page_output_schema(): array {
+		return array(
+			'type'       => 'object',
+			'properties' => array(
+				'post_id'           => array( 'type' => 'integer' ),
+				'post_type'         => array( 'type' => 'string' ),
+				'slug'              => array( 'type' => 'string' ),
+				'title'             => array( 'type' => 'string' ),
+				'status'            => array( 'type' => 'string' ),
+				'link'              => array( 'type' => 'string' ),
+				'modified'          => array( 'type' => 'string' ),
+				'excerpt'           => array( 'type' => 'string' ),
+				'featured_image'    => $this->get_featured_image_schema(),
+				'template'          => array( 'type' => 'string' ),
+				'elementor_enabled' => array( 'type' => 'boolean' ),
+				'document_type'     => array( 'type' => 'string' ),
+				'page_settings'     => array( 'type' => 'object' ),
+				'element_count'     => array( 'type' => 'integer' ),
+				'elements'          => array(
+					'type'  => 'array',
+					'items' => array( 'type' => 'object' ),
+				),
+			),
+		);
+	}
+
+	/**
+	 * Returns the JSON Schema for compact page identifier responses.
+	 *
+	 * @since 1.4.4
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function get_page_identifier_output_schema(): array {
+		return array(
+			'type'       => 'object',
+			'properties' => array(
+				'post_id'   => array( 'type' => 'integer' ),
+				'post_type' => array( 'type' => 'string' ),
+				'slug'      => array( 'type' => 'string' ),
+				'title'     => array( 'type' => 'string' ),
+			),
+		);
+	}
+
+	/**
 	 * Registers the list-pages ability.
 	 *
 	 * @since 1.0.0
@@ -928,6 +1004,195 @@ class Elementor_MCP_Query_Abilities {
 		}
 
 		return array( 'pages' => $pages );
+	}
+
+	/**
+	 * Registers the get-page ability.
+	 *
+	 * @since 1.4.4
+	 */
+	private function register_get_page(): void {
+		elementor_mcp_register_ability(
+			'elementor-mcp/get-page',
+			array(
+				'label'               => __( 'Get Elementor Page', 'elementor-mcp' ),
+				'description'         => __( 'Returns one Elementor-built page or post by post ID, including WordPress metadata, Elementor page settings, and the full element tree.', 'elementor-mcp' ),
+				'category'            => 'elementor-mcp',
+				'execute_callback'    => array( $this, 'execute_get_page' ),
+				'permission_callback' => array( $this, 'check_read_permission' ),
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'post_id' => array(
+							'type'        => 'integer',
+							'description' => __( 'The Elementor page/post ID.', 'elementor-mcp' ),
+						),
+					),
+					'required'   => array( 'post_id' ),
+				),
+				'output_schema'       => $this->get_rich_page_output_schema(),
+				'meta'                => array(
+					'annotations'  => array(
+						'readonly'    => true,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+					'show_in_rest' => true,
+				),
+			)
+		);
+	}
+
+	/**
+	 * Executes the get-page ability.
+	 *
+	 * @since 1.4.4
+	 *
+	 * @param array $input The input parameters.
+	 * @return array|\WP_Error
+	 */
+	public function execute_get_page( $input ) {
+		$post_id = absint( $input['post_id'] ?? 0 );
+
+		if ( ! $post_id ) {
+			return new \WP_Error( 'missing_post_id', __( 'The post_id parameter is required.', 'elementor-mcp' ) );
+		}
+
+		return $this->data->get_rich_page_payload( $post_id );
+	}
+
+	/**
+	 * Registers the get-page-by-slug ability.
+	 *
+	 * @since 1.4.4
+	 */
+	private function register_get_page_by_slug(): void {
+		elementor_mcp_register_ability(
+			'elementor-mcp/get-page-by-slug',
+			array(
+				'label'               => __( 'Get Elementor Page By Slug', 'elementor-mcp' ),
+				'description'         => __( 'Resolves an Elementor-built page or post by slug and returns WordPress metadata, Elementor page settings, and the full element tree. Searches pages and posts unless post_type is provided.', 'elementor-mcp' ),
+				'category'            => 'elementor-mcp',
+				'execute_callback'    => array( $this, 'execute_get_page_by_slug' ),
+				'permission_callback' => array( $this, 'check_read_permission' ),
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'slug'      => array(
+							'type'        => 'string',
+							'description' => __( 'The page or post slug.', 'elementor-mcp' ),
+						),
+						'post_type' => array(
+							'type'        => 'string',
+							'enum'        => array( 'page', 'post' ),
+							'description' => __( 'Optional content type filter. Supported values: "page" or "post".', 'elementor-mcp' ),
+						),
+					),
+					'required'   => array( 'slug' ),
+				),
+				'output_schema'       => $this->get_rich_page_output_schema(),
+				'meta'                => array(
+					'annotations'  => array(
+						'readonly'    => true,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+					'show_in_rest' => true,
+				),
+			)
+		);
+	}
+
+	/**
+	 * Executes the get-page-by-slug ability.
+	 *
+	 * @since 1.4.4
+	 *
+	 * @param array $input The input parameters.
+	 * @return array|\WP_Error
+	 */
+	public function execute_get_page_by_slug( $input ) {
+		$slug      = sanitize_text_field( $input['slug'] ?? '' );
+		$post_type = sanitize_key( $input['post_type'] ?? '' );
+
+		if ( '' === $slug ) {
+			return new \WP_Error( 'missing_slug', __( 'The slug parameter is required.', 'elementor-mcp' ) );
+		}
+
+		$post = $this->data->get_elementor_post_by_slug( $slug, $post_type );
+
+		if ( is_wp_error( $post ) ) {
+			return $post;
+		}
+
+		return $this->data->get_rich_page_payload( $post->ID );
+	}
+
+	/**
+	 * Registers the get-page-id-by-slug ability.
+	 *
+	 * @since 1.4.4
+	 */
+	private function register_get_page_id_by_slug(): void {
+		elementor_mcp_register_ability(
+			'elementor-mcp/get-page-id-by-slug',
+			array(
+				'label'               => __( 'Get Elementor Page ID By Slug', 'elementor-mcp' ),
+				'description'         => __( 'Resolves a slug to a single Elementor-built page or post and returns a compact identifier payload. Searches pages and posts unless post_type is provided.', 'elementor-mcp' ),
+				'category'            => 'elementor-mcp',
+				'execute_callback'    => array( $this, 'execute_get_page_id_by_slug' ),
+				'permission_callback' => array( $this, 'check_read_permission' ),
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'slug'      => array(
+							'type'        => 'string',
+							'description' => __( 'The page or post slug.', 'elementor-mcp' ),
+						),
+						'post_type' => array(
+							'type'        => 'string',
+							'enum'        => array( 'page', 'post' ),
+							'description' => __( 'Optional content type filter. Supported values: "page" or "post".', 'elementor-mcp' ),
+						),
+					),
+					'required'   => array( 'slug' ),
+				),
+				'output_schema'       => $this->get_page_identifier_output_schema(),
+				'meta'                => array(
+					'annotations'  => array(
+						'readonly'    => true,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+					'show_in_rest' => true,
+				),
+			)
+		);
+	}
+
+	/**
+	 * Executes the get-page-id-by-slug ability.
+	 *
+	 * @since 1.4.4
+	 *
+	 * @param array $input The input parameters.
+	 * @return array|\WP_Error
+	 */
+	public function execute_get_page_id_by_slug( $input ) {
+		$slug      = sanitize_text_field( $input['slug'] ?? '' );
+		$post_type = sanitize_key( $input['post_type'] ?? '' );
+
+		if ( '' === $slug ) {
+			return new \WP_Error( 'missing_slug', __( 'The slug parameter is required.', 'elementor-mcp' ) );
+		}
+
+		$post = $this->data->get_elementor_post_by_slug( $slug, $post_type );
+
+		if ( is_wp_error( $post ) ) {
+			return $post;
+		}
+
+		return $this->data->get_page_identifier_payload( $post );
 	}
 
 	/**

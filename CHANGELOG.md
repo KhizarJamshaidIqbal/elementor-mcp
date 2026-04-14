@@ -4,8 +4,16 @@ All notable changes to MCP Tools for Elementor are documented in this file.
 
 ## [Unreleased]
 
+- New: 3 page lookup/query tools - `get-page`, `get-page-by-slug`, `get-page-id-by-slug`.
+- New: 2 page metadata tools - `update-page-post`, `update-page-meta`.
+- New: `duplicate-page` tool to clone Elementor-built content with copied taxonomies, post meta, and refreshed Elementor CSS.
+- New: companion `@elementor-mcp/cli` package with endpoint proxy mode and WordPress REST fallback mode for page/file workflows.
+- New: companion CLI REST fallback `duplicate_page` workflow for read/write environments that expose Elementor meta through `wp/v2`.
+- Fix: companion CLI REST fallback no longer hangs on permalink auto-detection and now reports `rest_forbidden_context` as a clear edit-context capability error.
+- Fix: companion CLI endpoint mode now uses JSON POST negotiation and surfaces MCP endpoint HTTP errors immediately instead of hanging on unsupported streaming responses.
+
 - New: 5 Pro widget convenience tools — code-highlight, reviews, off-canvas, progress-tracker, search.
-- Total MCP tools increased from 92 to 97.
+- Total MCP tools increased to 106.
 
 ## [1.4.2]
 

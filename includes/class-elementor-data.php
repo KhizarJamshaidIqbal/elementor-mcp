@@ -549,6 +549,57 @@ class Elementor_MCP_Data {
 		$copied_taxonomies = $this->copy_post_taxonomies( $post->ID, $new_post_id, $post->post_type );
 		$copied_meta_keys  = $this->copy_post_meta( $post->ID, $new_post_id );
 
+		// Elementor data integrity guard.
+		//
+		// copy_post_meta() round-trips every meta value through add_post_meta(),
+		// which internally calls wp_unslash() on the value. For _elementor_data —
+		// a long JSON string full of escape sequences like \", \/ and \uXXXX —
+		// that unslash pass strips backslashes and silently corrupts the JSON,
+		// leaving the duplicated page with an unreadable element tree that
+		// renders as raw fallback HTML.
+		//
+		// To guarantee correctness we read the source element tree via the
+		// Elementor document API (which always returns a clean array) and
+		// re-save it onto the new post through save_page_data(), which routes
+		// through $document->save() and triggers CSS regeneration.
+		$source_elements = $this->get_page_data( $post->ID );
+		$elementor_copy_status = 'skipped_empty_source';
+
+		if ( is_array( $source_elements ) && ! empty( $source_elements ) ) {
+			$save_result = $this->save_page_data( $new_post_id, $source_elements );
+
+			if ( is_wp_error( $save_result ) ) {
+				// Roll back the empty duplicate to avoid leaving an orphan page.
+				wp_delete_post( $new_post_id, true );
+				return new \WP_Error(
+					'duplicate_elementor_save_failed',
+					sprintf(
+						/* translators: %s: underlying error message */
+						__( 'Failed to copy Elementor element tree to duplicate: %s', 'elementor-mcp' ),
+						$save_result->get_error_message()
+					)
+				);
+			}
+
+			// Verify the write actually landed — defends against silent corruption.
+			$verify_raw = get_post_meta( $new_post_id, '_elementor_data', true );
+			$verify_ok  = false;
+			if ( is_string( $verify_raw ) && '' !== $verify_raw ) {
+				$verify_decoded = json_decode( $verify_raw, true );
+				$verify_ok      = is_array( $verify_decoded ) && ! empty( $verify_decoded );
+			}
+
+			if ( ! $verify_ok ) {
+				wp_delete_post( $new_post_id, true );
+				return new \WP_Error(
+					'duplicate_elementor_verify_failed',
+					__( 'Duplicate created but _elementor_data failed JSON integrity check after save.', 'elementor-mcp' )
+				);
+			}
+
+			$elementor_copy_status = 'copied_via_document_save';
+		}
+
 		$this->refresh_elementor_css( $new_post_id );
 
 		$payload = $this->get_rich_page_payload( $new_post_id );
@@ -556,9 +607,10 @@ class Elementor_MCP_Data {
 			return $payload;
 		}
 
-		$payload['source_post_id']      = $post->ID;
-		$payload['copied_taxonomies']   = $copied_taxonomies;
+		$payload['source_post_id']        = $post->ID;
+		$payload['copied_taxonomies']     = $copied_taxonomies;
 		$payload['copied_meta_key_count'] = count( $copied_meta_keys );
+		$payload['elementor_copy_status'] = $elementor_copy_status;
 
 		return $payload;
 	}
@@ -1015,6 +1067,10 @@ class Elementor_MCP_Data {
 			'_edit_last',
 			'_wp_old_slug',
 			'_elementor_css',
+			// _elementor_data is re-saved via the document API in duplicate_elementor_post()
+			// so we skip it here to avoid JSON corruption caused by WordPress's
+			// internal wp_unslash() pass inside add_metadata().
+			'_elementor_data',
 		);
 
 		foreach ( $all_meta as $meta_key => $meta_values ) {
@@ -1023,7 +1079,11 @@ class Elementor_MCP_Data {
 			}
 
 			foreach ( (array) $meta_values as $meta_value ) {
-				add_post_meta( $target_post_id, $meta_key, maybe_unserialize( $meta_value ) );
+				$unserialized = maybe_unserialize( $meta_value );
+				// wp_slash() compensates for the wp_unslash() pass inside add_metadata()
+				// so backslash-containing strings (escaped quotes, unicode escapes, JSON)
+				// survive the round-trip intact. wp_slash() handles arrays recursively.
+				add_post_meta( $target_post_id, $meta_key, wp_slash( $unserialized ) );
 			}
 
 			$copied_meta[] = $meta_key;

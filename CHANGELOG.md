@@ -4,6 +4,7 @@ All notable changes to MCP Tools for Elementor are documented in this file.
 
 ## [Unreleased]
 
+- Fix: `duplicate-page` now correctly copies the Elementor element tree. The previous implementation relied on `copy_post_meta()` alone, which routed `_elementor_data` through `add_post_meta()` and triggered WordPress's internal `wp_unslash()` pass — stripping backslashes from escaped quotes and `\uXXXX` sequences in the JSON payload and silently producing a duplicate with an unreadable element tree that fell back to raw HTML rendering. `_elementor_data` is now excluded from the generic meta copier and re-saved on the target post via the Elementor document `save()` API, which also regenerates CSS. A post-save JSON integrity check rolls the duplicate back with a clear `WP_Error` if the element tree fails verification, and the response now includes an `elementor_copy_status` field. All other meta keys are also now `wp_slash()`ed before `add_post_meta()` to survive the round-trip.
 - New: 3 page lookup/query tools - `get-page`, `get-page-by-slug`, `get-page-id-by-slug`.
 - New: 2 page metadata tools - `update-page-post`, `update-page-meta`.
 - New: `duplicate-page` tool to clone Elementor-built content with copied taxonomies, post meta, and refreshed Elementor CSS.

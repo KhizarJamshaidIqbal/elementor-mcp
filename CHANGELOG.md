@@ -4,6 +4,34 @@ All notable changes to MCP Tools for Elementor are documented in this file.
 
 ## [Unreleased]
 
+### Inline Style Parser + dry_run mode (2026-04-18)
+
+Fixes the #1 fidelity gap in the HTML→Elementor importer: previously all `style="…"` attributes on imported containers were silently dropped, producing plain white boxes regardless of the design's intended colours, spacing, and layout.
+
+**New file: `includes/design/helpers/inline-style-parser.php`**
+Parses any CSS `style` attribute → Elementor settings array ready to `array_merge` into widget/container settings. Covered properties:
+- `background-color` / `background` (solid colour) → `background_background: classic` + `background_color`
+- `padding` / `margin` — full shorthand (1/2/3/4 values) + individual longhands → Elementor dimension array `{top,right,bottom,left,unit,isLinked}`
+- `border-radius` — shorthand + per-corner longhands → `border_radius` dimension array
+- `min-height` / `height` → `min_height` size array; `max-width` → `content_width: custom` + `custom_width`
+- `color` → `color`; `font-size/weight/line-height/letter-spacing/text-align/text-transform` → typography controls
+- `opacity` → `opacity` size array
+- `border` shorthand → `border_width` + `border_color`
+- `display:flex` + `flex-direction/align-items/justify-content/flex-wrap` → Elementor flex controls
+- `gap` / `column-gap` / `row-gap` → `flex_gap`
+
+**Integration:**
+- `emcp_design_extractor_container()` in `widget-map.php` now merges `emcp_parse_inline_styles($style)` into container settings (overriding defaults where set, preserving `css_classes` and `_element_id`).
+- `elementor-mcp.php`: `require_once` added for new helper.
+
+**`dry_run` mode for `import-design` tool:**
+New boolean input param `dry_run` (default `false`). When `true`, parses HTML + produces full stats/unmapped_elements WITHOUT writing to any page or creating any WordPress post. Enables inspect-before-commit workflow: run `dry_run: true` → read `unmapped_elements` → re-annotate HTML with `data-emcp-widget` → run final import.
+Missing `page_id`/`title` validation is bypassed in `dry_run` mode.
+
+**Smoke tests:** 29/29 inline-style-parser assertions pass. 62/62 overall smoke test still green.
+
+---
+
 ### FAQ Page Visual Parity — Phase A of v1.5.0 fidelity upgrade (2026-04-18)
 
 Immediate fix for the `/faq/` page losing design fidelity because the pattern file renamed every design CSS class to a scoped `.emcp-faqpf-*` namespace + dumped 900 lines of CSS inline via an HTML widget.

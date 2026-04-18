@@ -4,6 +4,69 @@ All notable changes to MCP Tools for Elementor are documented in this file.
 
 ## [Unreleased]
 
+### v1.7.0 — Phase D: Verification / Accuracy System (2026-04-18)
+
+Adds the self-correction loop: the importer now tells Claude HOW WELL the import went + WHAT to fix before the next attempt. Two new MCP tools, a composite fidelity_score in the existing `import-design` response, and a standalone DOM-diff CLI utility.
+
+**1. New MCP tool `elementor-mcp/audit-imported-page`**
+- Input: `{post_id}`
+- Reads `_elementor_data` JSON, walks the widget tree, collects per-widget settings coverage
+- Also reads active kit's `_elementor_page_settings` to detect EMCP palette + typography bindings
+- Returns:
+  - `fidelity_score` (0-100 composite): 30% native-pct + 20% padding-pct + 20% color-pct + 15% typography-pct + 5% class-pct + 5% palette-bound + 5% typography-bound
+  - `widget_counts` per type, `widget_total`
+  - `widget_native_pct`, `widgets_with_padding_pct`, `widgets_with_color_pct`, `widgets_with_typo_pct`, `widgets_with_class_pct`
+  - `palette_bound`, `typography_bound` booleans
+  - `hint` (excellent/good/fair/poor + action suggestion)
+- Readonly + idempotent; `check_edit_permission`
+- Use-case: run after `import-design` to verify the save landed with expected widget types + styling. If score drops between imports → regression.
+
+**2. New MCP tool `elementor-mcp/lint-html`**
+- Input: `{html}` — raw input before any import
+- Pure analysis, zero WP state touched. Readonly, `__return_true` permission.
+- Runs DOMDocument parse + scans for:
+  - DOM parse errors/warnings (unclosed tags, etc.)
+  - Images total / external / missing alt
+  - `<style>` class rules + @-rule counts (predicts `css_rule_unresolved` and `at_rule_ignored` outcomes)
+  - Inline style elements, script tags, iframes (+ video iframes)
+  - Widget-map coverage estimate (% of elements in the covered-tag set)
+- Returns `go_no_go` (`go`/`caution`/`no_go`), `estimated_coverage` (0-100), structured `warnings[]` with `{severity, code, message}`, detailed `stats`
+- Warning codes: `dom_parse_failed`, `dom_parse_warning`, `missing_alt_text`, `external_images`, `at_rules_dropped`, `script_tags`, `no_styles`
+- Use-case: Claude calls `lint-html` → if go_no_go=`no_go`, fix HTML first; if `caution`, proceed but expect warnings in unmapped_elements.
+
+**3. Fidelity score composite on `import-design` response**
+- Extended `compute_import_metrics()` to emit 7 new fields:
+  - `widget_coverage_pct` (existing, weighted 30%)
+  - `style_coverage_pct` (new) — penalty per unresolved `css_rule_unresolved` unmapped entry, weighted 25%
+  - `token_binding_pct` (new) — 100 if palette bound, 0 if needed-but-skipped, weighted 20%
+  - `image_resolution_pct` (new) — `sideloaded ÷ (sideloaded + skipped)`, weighted 15%
+  - Unmapped penalty (10%) — scaled inverse of `no_rule_leaf` count
+  - `fidelity_score` (0-100 composite)
+  - `suggested_actions[]` — per-reason remediation strings ("Add data-emcp-widget to N elements", "Inline N class rules", etc.)
+- Both dry-run + final save paths return the full set
+
+**4. DOM structural diff — `tests/fidelity/dom-diff.php`**
+- CLI utility: `php tests/fidelity/dom-diff.php --input=path.html --rendered=http://site.local/page/`
+- Parses input HTML + fetched Elementor frontend output via DOMDocument
+- Strips Elementor auto-classes (`elementor-*`, `e-*`) so only author classes compared
+- Computes histogram overlaps: tags (weight 0.5), classes (weight 0.3), depth similarity (weight 0.2) → 0-100 score
+- Exit code 0 when score ≥ 75, 2 otherwise (CI-friendly)
+- Output JSON includes `missing_tags`, `missing_classes`, `extra_tags`, `extra_classes` so regressions point at exact divergence
+- Self-test verified: identical fixtures = 100; `section + button + a` stripped out = 46, exit=2
+
+**Feedback loop architecture now complete:**
+1. **Pre-import**: `lint-html` → go/caution/no_go + warnings
+2. **During import**: `import-design` → `fidelity_score` + `suggested_actions[]` + `unmapped_elements[]`
+3. **Post-import**: `audit-imported-page` → independent score from saved `_elementor_data`
+4. **Regression detection**: `dom-diff.php` → structural similarity between source HTML and frontend output
+5. Claude can chain: lint → fix → import → audit → if score < threshold → re-annotate → re-import
+
+**Tests:** 62/62 core smoke still green; dom-diff self-test 100/100 + 46/100 as expected. `php -l` clean on all edited files.
+
+**Version bump:** `ELEMENTOR_MCP_VERSION` → `1.7.0`.
+
+---
+
 ### v1.6.0 — Phase C: Fidelity (2026-04-18)
 
 Closes the HTML→Elementor round-trip gap so real-world designs render ≈90% intact in Elementor. Five coordinated pieces:

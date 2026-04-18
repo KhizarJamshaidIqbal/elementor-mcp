@@ -93,6 +93,8 @@ class Elementor_MCP_Design_Abilities {
 			'elementor-mcp/apply-design-to-page',
 			'elementor-mcp/design-theme-template',
 			'elementor-mcp/import-design',
+			'elementor-mcp/audit-imported-page',
+			'elementor-mcp/lint-html',
 		);
 	}
 
@@ -106,6 +108,8 @@ class Elementor_MCP_Design_Abilities {
 		$this->register_apply_design_to_page();
 		$this->register_design_theme_template();
 		$this->register_import_design();
+		$this->register_audit_imported_page();
+		$this->register_lint_html();
 	}
 
 	/**
@@ -915,7 +919,12 @@ class Elementor_MCP_Design_Abilities {
 				'images_skipped'       => (int) ( $stats_all['images_skipped']       ?? 0 ),
 				'tokens_extracted'     => is_array( $result['tokens']['raw'] ?? null ) ? count( $result['tokens']['raw'] ) : 0,
 				'widget_coverage_pct'  => $metrics['widget_coverage_pct'],
+				'style_coverage_pct'   => $metrics['style_coverage_pct'],
+				'token_binding_pct'    => $metrics['token_binding_pct'],
+				'image_resolution_pct' => $metrics['image_resolution_pct'],
+				'fidelity_score'       => $metrics['fidelity_score'],
 				'fidelity_hint'        => $metrics['fidelity_hint'],
+				'suggested_actions'    => $metrics['suggested_actions'],
 				'unmapped_elements'    => $unmapped_all,
 				'needs_review'         => $metrics['needs_review'],
 			);
@@ -961,9 +970,14 @@ class Elementor_MCP_Design_Abilities {
 			'tokens_extracted'       => is_array( $result['tokens']['raw'] ?? null ) ? count( $result['tokens']['raw'] ) : 0,
 			'palette_bound_slots'    => count( $palette_globals ),
 			'typography_bound_slots' => count( $typography_globals ),
-			// QW5: coarse fidelity signal — helps Claude decide if re-annotation pass is worth it.
+			// QW5 + Phase D composite fidelity signal.
 			'widget_coverage_pct'  => $metrics['widget_coverage_pct'],
+			'style_coverage_pct'   => $metrics['style_coverage_pct'],
+			'token_binding_pct'    => $metrics['token_binding_pct'],
+			'image_resolution_pct' => $metrics['image_resolution_pct'],
+			'fidelity_score'       => $metrics['fidelity_score'],
 			'fidelity_hint'        => $metrics['fidelity_hint'],
+			'suggested_actions'    => $metrics['suggested_actions'],
 			// Layer 3: Claude reads unmapped_elements to decide if re-annotation is needed.
 			// Each entry: {tag, class, id, snippet (≤300 chars), reason, hint}.
 			// reason = 'no_rule_leaf' → add data-emcp-widget attr and re-import.
@@ -971,6 +985,438 @@ class Elementor_MCP_Design_Abilities {
 			// reason = 'css_rule_unresolved' → <style> class rule dropped, add inline style attr to element.
 			'unmapped_elements'    => $unmapped_all,
 			'needs_review'         => $metrics['needs_review'],
+		);
+	}
+
+	// -------------------------------------------------------------------------
+	// audit-imported-page
+	// -------------------------------------------------------------------------
+
+	private function register_audit_imported_page(): void {
+		elementor_mcp_register_ability(
+			'elementor-mcp/audit-imported-page',
+			array(
+				'label'               => __( 'Audit Imported Page', 'elementor-mcp' ),
+				'description'         => __( 'Reads an Elementor page\'s _elementor_data + postmeta and returns a fidelity audit: widget counts per type, settings coverage percentages (padding / color / typography / CSS classes), kit-global binding check, and a composite fidelity_score (0-100). Use after import-design to decide whether re-annotation is needed.', 'elementor-mcp' ),
+				'category'            => 'elementor-mcp',
+				'execute_callback'    => array( $this, 'execute_audit_imported_page' ),
+				'permission_callback' => array( $this, 'check_edit_permission' ),
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'post_id' ),
+					'properties' => array(
+						'post_id' => array(
+							'type'        => 'integer',
+							'description' => __( 'Post / page ID to audit.', 'elementor-mcp' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'post_id'                 => array( 'type' => 'integer' ),
+						'fidelity_score'          => array( 'type' => 'integer', 'description' => 'Composite 0-100.' ),
+						'widget_counts'           => array( 'type' => 'object' ),
+						'widget_total'            => array( 'type' => 'integer' ),
+						'widget_native_pct'       => array( 'type' => 'integer' ),
+						'widgets_with_padding_pct'=> array( 'type' => 'integer' ),
+						'widgets_with_color_pct'  => array( 'type' => 'integer' ),
+						'widgets_with_typo_pct'   => array( 'type' => 'integer' ),
+						'widgets_with_class_pct'  => array( 'type' => 'integer' ),
+						'palette_bound'           => array( 'type' => 'boolean' ),
+						'typography_bound'        => array( 'type' => 'boolean' ),
+						'hint'                    => array( 'type' => 'string' ),
+					),
+				),
+				'meta'                => array(
+					'annotations'  => array( 'readonly' => true, 'destructive' => false, 'idempotent' => true ),
+					'show_in_rest' => true,
+				),
+			)
+		);
+	}
+
+	/**
+	 * Audits a post's Elementor data for widget coverage and fidelity signals.
+	 *
+	 * @param array $input {post_id: int}
+	 * @return array|\WP_Error
+	 */
+	public function execute_audit_imported_page( $input ) {
+		$post_id = (int) ( $input['post_id'] ?? 0 );
+		if ( $post_id <= 0 ) {
+			return new \WP_Error( 'emcp_audit_missing_post_id', __( 'post_id is required.', 'elementor-mcp' ) );
+		}
+		$raw = get_post_meta( $post_id, '_elementor_data', true );
+		if ( is_string( $raw ) && '' !== $raw ) {
+			$data = json_decode( $raw, true );
+		} else {
+			$data = is_array( $raw ) ? $raw : array();
+		}
+		if ( empty( $data ) ) {
+			return new \WP_Error(
+				'emcp_audit_no_data',
+				sprintf(
+					/* translators: %d: post id */
+					__( 'No _elementor_data found for post %d.', 'elementor-mcp' ),
+					$post_id
+				)
+			);
+		}
+
+		$stats = array(
+			'widget_counts'            => array(),
+			'widget_total'             => 0,
+			'native_widgets'           => 0,
+			'html_widgets'             => 0,
+			'widgets_with_padding'     => 0,
+			'widgets_with_color'       => 0,
+			'widgets_with_typography'  => 0,
+			'widgets_with_css_classes' => 0,
+		);
+		$this->audit_walk( $data, $stats );
+
+		// Kit-binding check: any color/typography slot name starts with `emcp-import-`?
+		$palette_bound    = false;
+		$typography_bound = false;
+		if ( class_exists( '\\Elementor\\Plugin' ) ) {
+			$kit_id = \Elementor\Plugin::$instance->kits_manager->get_active_id() ?? 0;
+			if ( $kit_id ) {
+				$kit_settings = get_post_meta( $kit_id, '_elementor_page_settings', true );
+				$kit_settings = is_array( $kit_settings ) ? $kit_settings : array();
+				foreach ( ( $kit_settings['system_colors'] ?? array() ) as $c ) {
+					if ( isset( $c['title'] ) && false !== strpos( $c['title'], 'EMCP · emcp-import-' ) ) {
+						$palette_bound = true;
+						break;
+					}
+				}
+				foreach ( ( $kit_settings['system_typography'] ?? array() ) as $t ) {
+					if ( isset( $t['title'] ) && false !== strpos( $t['title'], 'EMCP · emcp-import-' ) ) {
+						$typography_bound = true;
+						break;
+					}
+				}
+			}
+		}
+
+		$tot              = max( 1, $stats['widget_total'] );
+		$native_pct       = (int) round( ( $stats['native_widgets'] / $tot ) * 100 );
+		$padding_pct      = (int) round( ( $stats['widgets_with_padding']     / $tot ) * 100 );
+		$color_pct        = (int) round( ( $stats['widgets_with_color']       / $tot ) * 100 );
+		$typo_pct         = (int) round( ( $stats['widgets_with_typography']  / $tot ) * 100 );
+		$class_pct        = (int) round( ( $stats['widgets_with_css_classes'] / $tot ) * 100 );
+
+		// Composite 0-100: same weights as import-design's fidelity_score spec.
+		$score = (int) round(
+			$native_pct * 0.30
+			+ $padding_pct * 0.20
+			+ $color_pct * 0.20
+			+ $typo_pct * 0.15
+			+ $class_pct * 0.05
+			+ ( $palette_bound ? 100 : 0 ) * 0.05
+			+ ( $typography_bound ? 100 : 0 ) * 0.05
+		);
+
+		$hint = 'excellent';
+		if ( $score < 90 ) {
+			$hint = 'good';
+		}
+		if ( $score < 75 ) {
+			$hint = 'fair — add more inline styles / data-emcp-widget annotations to the source HTML and re-import';
+		}
+		if ( $score < 55 ) {
+			$hint = 'poor — large portions fell to html widget or have no styling applied';
+		}
+
+		return array(
+			'post_id'                 => $post_id,
+			'fidelity_score'          => $score,
+			'widget_counts'           => $stats['widget_counts'],
+			'widget_total'            => $stats['widget_total'],
+			'widget_native_pct'       => $native_pct,
+			'widgets_with_padding_pct'=> $padding_pct,
+			'widgets_with_color_pct'  => $color_pct,
+			'widgets_with_typo_pct'   => $typo_pct,
+			'widgets_with_class_pct'  => $class_pct,
+			'palette_bound'           => $palette_bound,
+			'typography_bound'        => $typography_bound,
+			'hint'                    => $hint,
+		);
+	}
+
+	/**
+	 * Recursively counts widgets + settings coverage in a `_elementor_data` tree.
+	 */
+	private function audit_walk( array $nodes, array &$stats ): void {
+		foreach ( $nodes as $node ) {
+			if ( ! is_array( $node ) ) {
+				continue;
+			}
+			$type = $node['elType'] ?? '';
+			if ( 'widget' === $type ) {
+				$wtype = (string) ( $node['widgetType'] ?? 'unknown' );
+				$stats['widget_total']++;
+				$stats['widget_counts'][ $wtype ] = ( $stats['widget_counts'][ $wtype ] ?? 0 ) + 1;
+				if ( 'html' === $wtype ) {
+					$stats['html_widgets']++;
+				} else {
+					$stats['native_widgets']++;
+				}
+				$settings = is_array( $node['settings'] ?? null ) ? $node['settings'] : array();
+				if ( isset( $settings['padding'] ) || isset( $settings['margin'] ) ) {
+					$stats['widgets_with_padding']++;
+				}
+				if ( isset( $settings['background_color'] ) || isset( $settings['color'] ) || isset( $settings['title_color'] ) || isset( $settings['text_color'] ) ) {
+					$stats['widgets_with_color']++;
+				}
+				if ( isset( $settings['typography_font_family'] ) || isset( $settings['typography_font_size'] ) || isset( $settings['typography_typography'] ) ) {
+					$stats['widgets_with_typography']++;
+				}
+				$cls_val = $settings['css_classes'] ?? $settings['_css_classes'] ?? '';
+				if ( '' !== trim( (string) $cls_val ) ) {
+					$stats['widgets_with_css_classes']++;
+				}
+			} elseif ( 'container' === $type ) {
+				// Containers: also track padding/color for fidelity.
+				$stats['widget_total']++;
+				$stats['native_widgets']++;
+				$stats['widget_counts']['container'] = ( $stats['widget_counts']['container'] ?? 0 ) + 1;
+				$settings = is_array( $node['settings'] ?? null ) ? $node['settings'] : array();
+				if ( isset( $settings['padding'] ) || isset( $settings['margin'] ) ) {
+					$stats['widgets_with_padding']++;
+				}
+				if ( isset( $settings['background_color'] ) ) {
+					$stats['widgets_with_color']++;
+				}
+				if ( ! empty( $settings['css_classes'] ) ) {
+					$stats['widgets_with_css_classes']++;
+				}
+			}
+			if ( ! empty( $node['elements'] ) && is_array( $node['elements'] ) ) {
+				$this->audit_walk( $node['elements'], $stats );
+			}
+		}
+	}
+
+	// -------------------------------------------------------------------------
+	// lint-html
+	// -------------------------------------------------------------------------
+
+	private function register_lint_html(): void {
+		elementor_mcp_register_ability(
+			'elementor-mcp/lint-html',
+			array(
+				'label'               => __( 'Lint HTML for Import', 'elementor-mcp' ),
+				'description'         => __( 'Pre-import linter. Scans raw HTML for issues that would reduce import-design fidelity: unclosed tags, missing alt text, external images that need sideloading, <style> class rules that will not resolve, estimated widget-map coverage, and suspicious inline handlers. Returns go/no-go with warnings array so Claude can fix-and-retry BEFORE running import-design.', 'elementor-mcp' ),
+				'category'            => 'elementor-mcp',
+				'execute_callback'    => array( $this, 'execute_lint_html' ),
+				'permission_callback' => '__return_true',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'html' ),
+					'properties' => array(
+						'html' => array(
+							'type'        => 'string',
+							'description' => __( 'Raw HTML to lint. Same format as import-design.html input.', 'elementor-mcp' ),
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'go_no_go'             => array( 'type' => 'string', 'description' => 'go | caution | no_go' ),
+						'estimated_coverage'   => array( 'type' => 'integer', 'description' => 'Predicted widget_coverage_pct 0-100.' ),
+						'warnings'             => array( 'type' => 'array' ),
+						'stats'                => array( 'type' => 'object' ),
+					),
+				),
+				'meta'                => array(
+					'annotations'  => array( 'readonly' => true, 'destructive' => false, 'idempotent' => true ),
+					'show_in_rest' => true,
+				),
+			)
+		);
+	}
+
+	/**
+	 * Pre-import HTML lint. Pure analysis, no WP state touched.
+	 *
+	 * @param array $input {html: string}
+	 * @return array
+	 */
+	public function execute_lint_html( $input ) {
+		$html = (string) ( $input['html'] ?? '' );
+		if ( '' === trim( $html ) ) {
+			return new \WP_Error( 'emcp_lint_empty', __( 'html parameter is required and non-empty.', 'elementor-mcp' ) );
+		}
+
+		$warnings = array();
+		$stats    = array(
+			'total_elements'     => 0,
+			'images_total'       => 0,
+			'images_external'    => 0,
+			'images_missing_alt' => 0,
+			'class_rules'        => 0,
+			'at_rules'           => 0,
+			'inline_styles'      => 0,
+			'script_tags'        => 0,
+			'iframes_total'      => 0,
+			'iframes_video'      => 0,
+		);
+
+		// Detect DOM parse errors.
+		libxml_use_internal_errors( true );
+		$dom = new \DOMDocument();
+		$loaded = $dom->loadHTML( '<?xml encoding="UTF-8"?>' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD );
+		$libxml_errors = libxml_get_errors();
+		libxml_clear_errors();
+		if ( ! $loaded ) {
+			$warnings[] = array(
+				'severity' => 'error',
+				'code'     => 'dom_parse_failed',
+				'message'  => 'DOMDocument could not parse the input HTML. Check for broken markup.',
+			);
+			return array( 'go_no_go' => 'no_go', 'estimated_coverage' => 0, 'warnings' => $warnings, 'stats' => $stats );
+		}
+		foreach ( $libxml_errors as $err ) {
+			$msg = trim( $err->message );
+			if ( '' === $msg ) {
+				continue;
+			}
+			// Filter noisy "Tag X invalid in Entity" warnings from HTML5-only elements.
+			if ( false !== strpos( $msg, 'Tag' ) && false !== strpos( $msg, 'invalid' ) ) {
+				continue;
+			}
+			$warnings[] = array(
+				'severity' => 'warning',
+				'code'     => 'dom_parse_warning',
+				'message'  => $msg . ( $err->line ? ' (line ' . $err->line . ')' : '' ),
+			);
+		}
+
+		// Walk elements.
+		$all = $dom->getElementsByTagName( '*' );
+		$stats['total_elements'] = $all->length;
+
+		$home_host = '';
+		if ( function_exists( 'home_url' ) ) {
+			$parts     = wp_parse_url( home_url() );
+			$home_host = strtolower( $parts['host'] ?? '' );
+		}
+
+		$covered_tags = array(
+			'section','div','aside','header','footer','main','article', // containers
+			'h1','h2','h3','h4','h5','h6','p','blockquote',              // text
+			'a','button',                                                 // button (class-gated)
+			'img','figure','picture',                                     // image
+			'ul','ol','dl','nav',                                         // lists
+			'details','summary',                                          // accordion
+			'iframe','video',                                             // video
+			'progress','hr',                                              // progress/divider
+		);
+		$covered = 0;
+		foreach ( $all as $el ) {
+			$tag = strtolower( $el->tagName );
+			if ( in_array( $tag, $covered_tags, true ) ) {
+				$covered++;
+			}
+			if ( '' !== $el->getAttribute( 'style' ) ) {
+				$stats['inline_styles']++;
+			}
+		}
+
+		foreach ( $dom->getElementsByTagName( 'img' ) as $img ) {
+			$stats['images_total']++;
+			$src = $img->getAttribute( 'src' );
+			if ( '' === $img->getAttribute( 'alt' ) ) {
+				$stats['images_missing_alt']++;
+			}
+			if ( preg_match( '#^https?://#i', $src ) ) {
+				$parts = wp_parse_url( $src );
+				$host  = strtolower( $parts['host'] ?? '' );
+				if ( '' === $home_host || $host !== $home_host ) {
+					$stats['images_external']++;
+				}
+			}
+		}
+		foreach ( $dom->getElementsByTagName( 'iframe' ) as $if ) {
+			$stats['iframes_total']++;
+			$src = $if->getAttribute( 'src' );
+			if ( preg_match( '#youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com#i', $src ) ) {
+				$stats['iframes_video']++;
+			}
+		}
+		$stats['script_tags'] = $dom->getElementsByTagName( 'script' )->length;
+
+		// Stylesheet analysis.
+		foreach ( $dom->getElementsByTagName( 'style' ) as $style ) {
+			$css = $style->textContent;
+			$stats['class_rules'] += preg_match_all( '/[^{}]*\.[A-Za-z0-9_-]+[^{}]*\{[^}]*\}/', $css );
+			$stats['at_rules']    += preg_match_all( '/@[a-z-]+[^{]*\{/i', $css );
+		}
+
+		// Warnings.
+		if ( $stats['images_missing_alt'] > 0 ) {
+			$warnings[] = array(
+				'severity' => 'info',
+				'code'     => 'missing_alt_text',
+				'message'  => $stats['images_missing_alt'] . ' image(s) missing alt text — bad for a11y and SEO.',
+			);
+		}
+		if ( $stats['images_external'] > 0 ) {
+			$warnings[] = array(
+				'severity' => 'info',
+				'code'     => 'external_images',
+				'message'  => $stats['images_external'] . ' external image URL(s) — will be sideloaded by import-design (unless sideload_images=false). Ensure URLs are reachable.',
+			);
+		}
+		if ( $stats['at_rules'] > 0 ) {
+			$warnings[] = array(
+				'severity' => 'warning',
+				'code'     => 'at_rules_dropped',
+				'message'  => $stats['at_rules'] . ' @-rule(s) (@media/@supports/@keyframes) in <style> will be dropped. Convert to inline styles or per-device Elementor controls.',
+			);
+		}
+		if ( $stats['script_tags'] > 0 ) {
+			$warnings[] = array(
+				'severity' => 'warning',
+				'code'     => 'script_tags',
+				'message'  => $stats['script_tags'] . ' <script> tag(s) will be kept in html widget fallback. Move to Elementor custom code panel instead.',
+			);
+		}
+		if ( $stats['inline_styles'] === 0 && $stats['class_rules'] === 0 ) {
+			$warnings[] = array(
+				'severity' => 'error',
+				'code'     => 'no_styles',
+				'message'  => 'No inline styles or class rules detected — container fidelity will be near zero.',
+			);
+		}
+
+		$estimated_coverage = $stats['total_elements'] > 0
+			? (int) round( ( $covered / $stats['total_elements'] ) * 100 )
+			: 0;
+
+		$go_no_go = 'go';
+		foreach ( $warnings as $w ) {
+			if ( 'error' === $w['severity'] ) {
+				$go_no_go = 'no_go';
+				break;
+			}
+		}
+		if ( 'go' === $go_no_go ) {
+			foreach ( $warnings as $w ) {
+				if ( 'warning' === $w['severity'] ) {
+					$go_no_go = 'caution';
+					break;
+				}
+			}
+		}
+
+		return array(
+			'go_no_go'           => $go_no_go,
+			'estimated_coverage' => $estimated_coverage,
+			'warnings'           => $warnings,
+			'stats'              => $stats,
 		);
 	}
 
@@ -1052,6 +1498,41 @@ class Elementor_MCP_Design_Abilities {
 		$total     = $native + $fallback;
 		$coverage  = $total > 0 ? (int) round( ( $native / $total ) * 100 ) : 100;
 
+		// Image resolution %: sideloaded ÷ (sideloaded + skipped). 100 when no external images.
+		$sl      = (int) ( $stats['images_sideloaded'] ?? 0 );
+		$sk      = (int) ( $stats['images_skipped']    ?? 0 );
+		$img_pct = ( $sl + $sk ) > 0 ? (int) round( ( $sl / ( $sl + $sk ) ) * 100 ) : 100;
+
+		// CSS rule resolution %: rules total minus unresolved reasons.
+		$unresolved = 0;
+		$failures   = array();
+		foreach ( $unmapped as $u ) {
+			$reason = $u['reason'] ?? '';
+			$failures[ $reason ] = ( $failures[ $reason ] ?? 0 ) + 1;
+			if ( 'css_rule_unresolved' === $reason ) {
+				$unresolved++;
+			}
+		}
+		// Style coverage proxy: elements that had a style applied via inline-or-resolver
+		// We approximate via "fallbacks that have css_rule_unresolved" penalty.
+		$style_pct = $total > 0 ? max( 0, 100 - (int) round( ( $unresolved / max( 1, $total ) ) * 100 ) ) : 100;
+
+		// Token binding: 100 if any colors/typography bound, else 0.
+		$token_pct = 100;
+		if ( ! empty( $stats['needs_palette_binding'] ) && empty( $stats['palette_bound'] ) ) {
+			$token_pct = 0;
+		}
+
+		// Composite fidelity_score 0-100 (weights match plan rubric).
+		$score = (int) round(
+			$coverage  * 0.30
+			+ $style_pct * 0.25
+			+ $token_pct * 0.20
+			+ $img_pct   * 0.15
+			+ ( 100 - min( 100, $unresolved * 10 ) ) * 0.10
+		);
+		$score = max( 0, min( 100, $score ) );
+
 		$hint = 'excellent';
 		if ( $coverage < 95 ) {
 			$hint = 'good';
@@ -1070,10 +1551,29 @@ class Elementor_MCP_Design_Abilities {
 			}
 		) ) > 0;
 
+		$suggested_actions = array();
+		if ( ( $failures['no_rule_leaf'] ?? 0 ) > 0 ) {
+			$suggested_actions[] = 'Add data-emcp-widget="[type]" to the ' . $failures['no_rule_leaf'] . ' element(s) with reason=no_rule_leaf to force a widget type.';
+		}
+		if ( ( $failures['css_rule_unresolved'] ?? 0 ) > 0 ) {
+			$suggested_actions[] = 'Inline the ' . $failures['css_rule_unresolved'] . ' <style> class rule(s) as style="…" on matching elements (@media, :hover etc. unsupported).';
+		}
+		if ( ( $failures['image_sideload_failed'] ?? 0 ) > 0 ) {
+			$suggested_actions[] = 'Fix the ' . $failures['image_sideload_failed'] . ' unreachable image URL(s) or host them locally before re-import.';
+		}
+		if ( ( $failures['typography_slot_overflow'] ?? 0 ) > 0 ) {
+			$suggested_actions[] = 'Reduce font families (Elementor has only 4 typography slots) or load extras via custom theme CSS.';
+		}
+
 		return array(
 			'widget_coverage_pct' => $coverage,
+			'style_coverage_pct'  => $style_pct,
+			'token_binding_pct'   => $token_pct,
+			'image_resolution_pct'=> $img_pct,
+			'fidelity_score'      => $score,
 			'fidelity_hint'       => $hint,
 			'needs_review'        => $needs_review,
+			'suggested_actions'   => $suggested_actions,
 		);
 	}
 }

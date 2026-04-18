@@ -827,13 +827,13 @@ body .emcp-faqpage .pop-card:hover .elementor-icon-box-icon .elementor-icon svg 
 
 .emcp-faqpage .elementor-tab-title {
   display: flex !important; align-items: center; gap: 18px;
-  padding: 20px 24px !important;
+  padding: 22px 26px !important;
   cursor: pointer; list-style: none;
   font-family: var(--f-display) !important;
   font-weight: 600 !important;
-  font-size: var(--fs-h4) !important;
+  font-size: var(--fs-h3) !important;
   color: var(--midnight) !important;
-  line-height: 1.35; user-select: none;
+  line-height: 1.3 !important; user-select: none;
   background: transparent !important;
   border: none !important;
   transition: color var(--d-fast) var(--ease), background var(--d-fast) var(--ease);
@@ -843,7 +843,23 @@ body .emcp-faqpage .pop-card:hover .elementor-icon-box-icon .elementor-icon svg 
   color: var(--sunset) !important;
   background: linear-gradient(180deg, rgba(233,104,12,.05), transparent) !important;
 }
-.emcp-faqpage .elementor-tab-title .elementor-accordion-title { flex: 1; }
+.emcp-faqpage .elementor-tab-title .elementor-accordion-title,
+.emcp-faqpage .elementor-tab-title a.elementor-accordion-title,
+.emcp-faqpage .elementor-tab-title span.elementor-accordion-title {
+  flex: 1;
+  font-family: var(--f-display) !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  color: inherit !important;
+  line-height: 1.35 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+.emcp-faqpage .elementor-tab-title.elementor-active .elementor-accordion-title,
+.emcp-faqpage .elementor-tab-title.elementor-active a.elementor-accordion-title,
+.emcp-faqpage .elementor-tab-title.elementor-active span.elementor-accordion-title {
+  color: var(--sunset) !important;
+}
 .emcp-faqpage .elementor-tab-title .elementor-accordion-icon {
   flex: 0 0 auto;
   width: 34px; height: 34px;

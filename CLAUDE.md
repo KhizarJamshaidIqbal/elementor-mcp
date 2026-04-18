@@ -2,6 +2,54 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
+## ⛔ IRON LAWS — READ FIRST EVERY SESSION (v1.7.4 · 2026-04-18)
+
+**Plugin = generator only.** Pages must survive plugin deletion. These rules were violated once (see v1.7.4 migration); never repeat.
+
+### Rule 1 — NO page-specific `.css` inside the plugin
+**Don't**: `includes/design/css/faq-page.css`, `checkout-page.css`, etc.
+**Why**: plugin delete → enqueue dies → page breaks.
+**Do**: put page-scoped CSS into the page's own `_elementor_page_settings.custom_css` (Elementor Pro Page Settings → Advanced → Custom CSS). CSS then lives in `wp_postmeta` and travels with the page on export/import, survives plugin deletion.
+
+### Rule 2 — NO page-specific `.php` pattern files for user's actual pages
+**Don't**: `includes/design/patterns/faq-page-full.php` (1000+ lines of hardcoded Safari Desert Dubai FAQ structure).
+**Why**: user's live page structure is content, not reusable template. Belongs in the page's `_elementor_data`, not the plugin.
+**Do**: reusable GENERIC patterns only (e.g. `hero.minimal-center`, `features.icon-grid-3col`). If building a one-off page, use `elementor-mcp/import-design` or the design-page tool with slots — don't crystallize into a plugin file.
+
+### Rule 3 — Widget native properties FIRST, custom CSS LAST
+**Don't**: wrap every style in `!important` CSS overrides.
+**Why**: Elementor widgets expose rich property surfaces (color, typography, padding, margin, background, hover, responsive variants). CSS fighting the widget instead of using its API = brittle.
+**Do**:
+1. Heading widget: set `title_color`, `typography_*` directly.
+2. Container: set `background_color`, `padding`, `margin`, `border_radius`, `flex_*` directly.
+3. Icon-list: `icon_color`, `text_color`, `space_between`.
+4. Accordion: `title_color`, `title_active_color`, `icon_color`, `content_color`.
+5. ONLY when the widget lacks the property → add rules to the PAGE's `custom_css` (still plugin-independent).
+
+### Rule 4 — NO runtime `wp_enqueue_style` hooks for page-specific assets
+**Don't**: `add_action('wp_enqueue_scripts', …)` that loads per-page CSS from the plugin.
+**Why**: creates a runtime dependency. Plugin delete = broken pages.
+**OK**: enqueues for GENERIC content wrappers (e.g. `.emcp-article` for blog posts under EMCP-generated templates) as long as they are ALL scoped to a wrapper class, never reach outside, and only apply when a post explicitly opts in via postmeta (`_emcp_generated`).
+
+### Rule 5 — MCP `update-page-settings` OVERWRITES (Gotcha 29)
+The tool does NOT merge. `{hide_title: "yes"}` wipes every other field. Always read-then-merge the full settings object, OR patch specific fields via direct SQL when full object would be too large for the MCP payload.
+
+### Rule 6 — Elementor v4 internal CSS stores in postmeta, not file (Gotcha 30)
+When `elementor_css_print_method = internal`, per-post CSS lives in `_elementor_css` postmeta (status=inline, css=<blob>). The file `uploads/elementor/css/post-NNN.css` only materializes with external print method AND after a proper save event. `\Elementor\Core\Files\CSS\Post::update()` regenerates; `get_full_path()` does NOT exist on that class in v4.
+
+### Rule 7 — Before any destructive file operation, BACKUP FIRST
+Export page JSON via `elementor-mcp-export-page` → save to `tests/backup-{slug}-{timestamp}.json`. Every time. No exceptions.
+
+### How to verify plugin-independence
+1. Deactivate plugin
+2. Hard-reload the page in browser
+3. Page must render identical (minus editor toolbar, obviously)
+4. If anything visually breaks → plugin has a runtime dependency that must be fixed
+
+---
+
 ## Project Overview
 
 MCP Tools for Elementor Plugin — a WordPress plugin that extends the official WordPress MCP Adapter to expose Elementor data, widgets, structures, and methods as MCP (Model Context Protocol) tools. This enables AI tools (Claude, Cursor, etc.) to create and manipulate Elementor page designs programmatically via 97 MCP tools.

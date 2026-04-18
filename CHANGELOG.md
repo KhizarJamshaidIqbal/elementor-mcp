@@ -4,6 +4,65 @@ All notable changes to MCP Tools for Elementor are documented in this file.
 
 ## [Unreleased]
 
+### v1.7.4 — Iron Laws + FAQ page migration (2026-04-18)
+
+**Architectural lesson, permanently recorded.** Plugin violated its own
+"generator only, not runtime dependency" principle by enqueueing
+`includes/design/css/faq-page.css` and shipping a 1000-line
+`includes/design/patterns/faq-page-full.php` template containing
+hardcoded Safari Desert Dubai FAQ copy. Plugin delete would have
+broken the live `/faq/` page.
+
+**Fix + 7 iron laws documented at top of `CLAUDE.md`:**
+
+1. **NO page-specific `.css`** in plugin — put page CSS into the page's
+   own `_elementor_page_settings.custom_css` (Elementor Pro).
+2. **NO page-specific `.php` pattern** for user's actual pages — reusable
+   generic patterns only (`hero.minimal-center`, `features.*`, etc.).
+3. **Widget native properties FIRST** (`title_color`, `typography_*`,
+   `padding`, `flex_*`); custom CSS LAST, only when the widget lacks
+   the property.
+4. **NO runtime `wp_enqueue_style` hooks** for page-specific assets.
+5. **MCP `update-page-settings` OVERWRITES** — read-then-merge or SQL-patch.
+6. **Elementor v4 internal CSS** stores in `_elementor_css` postmeta,
+   not file; `CSS\Post::get_full_path()` doesn't exist in v4.
+7. **Backup before anything destructive** via `elementor-mcp-export-page`.
+
+**Migration steps taken (verification end-to-end):**
+- Backup: `tests/backup-faq-3007-pre-css-migration.json` (56KB full export)
+- Injected 49KB of CSS into post 3007's `_elementor_page_settings.custom_css`
+  via direct SQL (MCP tool overwrote on first attempt — Gotcha 29)
+- Disabled `enqueue_faq_page_styles()` hook in `class-article-enhancer.php`
+- Removed faq-page.css enqueue from `enqueue_styles_unconditional()`
+- Deleted 6 plugin files:
+  - `includes/design/css/faq-page.css` (1321 lines)
+  - `includes/design/patterns/faq-page-full.php` (1040 lines)
+  - `tests/create-faq-page.php`
+  - `tests/tmp-update-custom-css.php` (temp helper)
+  - `tests/tmp-update.sql` (temp artifact)
+  - `tests/tmp-regen-css.php` (temp helper)
+- Triggered Elementor CSS regen by calling
+  `\Elementor\Core\Files\CSS\Post(3007)->update()` via loopback HTTP
+  helper → CSS materialized in `_elementor_css` postmeta since
+  `css_print_method=internal`
+
+**Verified in headless browser after ALL plugin deletions:**
+- `pluginCssLoaded: false` — zero plugin CSS link in page HTML
+- aside 240px sticky, title Playfair 24.6px, icon on LEFT orange,
+  TOC count right-aligned
+- 62/62 core smoke tests still green
+
+**New Gotchas:** 26 (static leakage), 27 (operator precedence on sideload
+gate), 28 (`overflow:hidden` kills sticky), 29 (MCP update-page-settings
+overwrites), 30 (Elementor v4 CSS in postmeta).
+
+**Plugin delta:** -2667 / +12 lines. Net: plugin became much smaller
+AND more plugin-independent for the user's FAQ page.
+
+**Version bump:** `ELEMENTOR_MCP_VERSION` → `1.7.4`.
+
+---
+
 ### v1.7.0 — Phase D: Verification / Accuracy System (2026-04-18)
 
 Adds the self-correction loop: the importer now tells Claude HOW WELL the import went + WHAT to fix before the next attempt. Two new MCP tools, a composite fidelity_score in the existing `import-design` response, and a standalone DOM-diff CLI utility.

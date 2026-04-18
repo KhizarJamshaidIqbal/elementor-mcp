@@ -4,6 +4,70 @@ All notable changes to MCP Tools for Elementor are documented in this file.
 
 ## [Unreleased]
 
+### v1.6.0 — Phase C: Fidelity (2026-04-18)
+
+Closes the HTML→Elementor round-trip gap so real-world designs render ≈90% intact in Elementor. Five coordinated pieces:
+
+**1. Widget emitter expansion** — 5 new emitters + rules in `widget-map.php`:
+- `<iframe src="youtube|vimeo">` and `<video>` → **video** widget (YT/Vimeo ID extracted, autoplay/mute/loop honoured for hosted)
+- `<progress>` and `.progress-bar` → **progress** widget (reads `value`/`max`, inline `width:N%`, or `data-progress`)
+- `<nav>/<ul>/<div class="social-icons">` → **social-icons** widget (12-platform domain+class match: facebook/twitter/x/instagram/linkedin/youtube/tiktok/pinterest/github/whatsapp/telegram)
+- `.swiper`/`.slick-slider`/`.carousel`/`.owl-carousel` → **image-carousel** widget (pulls all descendant `<img>` srcs as slides)
+- `<div class="tabs">` with `<li>` titles + `.tab-content` panels → **tabs** widget
+- New match condition: `attr_contains: [attr_name, 'regex|alts']` — attribute value regex matcher (used for iframe src URL matching)
+- Gotcha: social-icons rule ordered BEFORE generic `<nav>→icon-list` (rule 5a vs 5b) so `<nav class="social-icons">` routes correctly
+
+**2. Media sideloader** — new `Elementor_MCP_Design_Importer::sideload_external_images()`:
+- Pre-pass runs right after DOM parse, before widget walk
+- Every external `<img src="https://…">` (non-same-host, non-`data:`) downloaded via `download_url` + `media_handle_sideload`
+- On success: `src` rewritten to local WP URL + `data-emcp-attachment-id` attribute stamped
+- On failure: entry added to `unmapped_elements` with `reason: 'image_sideload_failed'`, image left external, non-fatal
+- Image extractors (`image`, `figure`, `wrapped_image`) now pick up attachment ID → Elementor native image widget with media library reference
+- New stats: `images_sideloaded`, `images_skipped`
+- New MCP input param: `sideload_images` (boolean, default `true`); auto-disabled in `dry_run` mode
+- Alt text copied to `_wp_attachment_image_alt` postmeta during sideload
+
+**3. CSS class-rule resolver** — new helper `includes/design/helpers/css-rule-resolver.php`:
+- `emcp_css_build_rule_map(string)` — parses `<style>` block into ordered `[{selector, decls}]` list
+- `emcp_css_selector_matches(string, DOMElement)` — tests selector against element; supports `.class`, `.a.b` AND, `.parent .child` descendant, `div.class` tag+class compound
+- `emcp_css_resolve_element_style(DOMElement, rule_map)` — walks rules in source order, merges matching declarations (later prop wins)
+- `emcp_css_current_rule_map($set)` — ambient accessor (static): Design_Importer publishes rule map at import start, clears at end
+- Integrated into `emcp_design_extractor_container()`: class-rule styles merged UNDER inline style → single effective-style string fed through `emcp_parse_inline_styles()` → Elementor settings
+- Explicitly unsupported (silent miss): `@media`/`@supports`/`@keyframes` (stripped), element-only selectors (`div {…}`), `[attr=x]`, `:hover/:focus`, `> + ~` combinators
+- Previously these dropped-styles lived only in `unmapped_elements` with `reason: 'css_rule_unresolved'` (Quick-Win QW4). Now resolved rules actually apply.
+
+**4. CSS function support** in `inline-style-parser`:
+- `emcp_inline_style_current_vars($set)` — ambient `--css-var → value` map, published by Design_Importer from css-var-extractor output
+- New `emcp_style_resolve_functions(string)`:
+  - `var(--name)` — lookup with 8-level depth cap (prevents cycles)
+  - `var(--name, fallback)` — honors fallback
+  - `rgba(var(--hex-var)/alpha)` and `rgba(var(--hex-var), alpha)` → resolve var, expand hex to `rgba(r,g,b,a)` numeric
+  - `calc(24px)` single-term unwrap → `24px` (multi-term passes through unchanged)
+- Wired into `emcp_style_parse_props` value normalization loop
+
+**5. Typography kit binder** — new method `Elementor_MCP_Kit_Binder::bind_typography_array($name, $families)`:
+- Writes to kit's `system_typography` (same postmeta pattern as `system_colors`)
+- Maps 4 Elementor slots: `primary` (display/heading/headline/title), `secondary` (secondary/sub/caption), `text` (body/paragraph/text), `accent` (accent/mono/brand)
+- Overflow families returned as `{overflow: {slot: cfg}}` → surfaced to `unmapped_elements` with `reason: 'typography_slot_overflow'`
+- Called from `execute_import_design()` alongside existing `bind_palette_array()`
+- New response field: `typography_bound_slots` (int)
+- Heuristic mapping in `typography_families_from_tokens()` uses token-name substrings; unmatched families fill remaining slots left-to-right
+
+**Test coverage:**
+- 62/62 core smoke (`tests/smoke-design-load.php`)
+- 17/17 Phase C widget extractor integration checks (video YT/Vimeo/hosted, progress, .progress-bar, social-icons + platform detection, carousel, tabs)
+- 15/15 CSS resolver unit checks (rule-map build, selector matching incl. descendant/compound, resolve order, ambient accessor get/clear)
+- 8/8 `var()`/`calc()`/`rgba(var())` checks (hex lookup, fallback, transitive chain, single-term calc unwrap, rgba expansion)
+- `php -l` syntax clean on all 6 touched files
+
+**Gotcha 26: Ambient static state across imports.** Both `emcp_css_current_rule_map` and `emcp_inline_style_current_vars` use `static` variables so free-function extractors can read without threading args. Design_Importer MUST call them with `null` at end of each `import()` to avoid second-import leakage. Both already wired.
+
+**Gotcha 27: Operator precedence on sideload gate.** First draft wrote `if ( $sideload_images && fn_exists('a') || fn_exists('b') )` which due to `||` < `&&` precedence always entered the branch when fn_b existed even if user opted out. Fix: simplified to `if ( $sideload_images )` and moved the WP-function check inside `sideload_external_images()`.
+
+**Version bump:** `ELEMENTOR_MCP_VERSION` → `1.6.0`.
+
+---
+
 ### v1.5.1 — Quick Wins pre-Phase-C (2026-04-18)
 
 Five surgical fixes raising importer fidelity + feedback before the bigger Phase C work lands.

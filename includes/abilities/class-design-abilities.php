@@ -780,6 +780,10 @@ class Elementor_MCP_Design_Abilities {
 							'type'        => 'boolean',
 							'description' => __( 'Skip <footer> / .site-footer elements. Default true.', 'elementor-mcp' ),
 						),
+						'sideload_images' => array(
+							'type'        => 'boolean',
+							'description' => __( 'Download external <img src="https://..."> to WP media library and rewrite src to local URL. Default true. Set false to keep URLs external (faster, fragile).', 'elementor-mcp' ),
+						),
 						'dry_run'      => array(
 							'type'        => 'boolean',
 							'description' => __( 'When true, parse the HTML and return stats/unmapped_elements WITHOUT saving to any page. Useful for inspecting what the importer would produce before committing. Default false.', 'elementor-mcp' ),
@@ -830,9 +834,10 @@ class Elementor_MCP_Design_Abilities {
 		$title       = sanitize_text_field( $input['title'] ?? '' );
 		$post_type   = sanitize_key( $input['post_type'] ?? 'page' );
 		$post_status = sanitize_key( $input['post_status'] ?? 'draft' );
-		$skip_header = (bool) ( $input['skip_header'] ?? true );
-		$skip_footer = (bool) ( $input['skip_footer'] ?? true );
-		$dry_run     = (bool) ( $input['dry_run']     ?? false );
+		$skip_header     = (bool) ( $input['skip_header']     ?? true );
+		$skip_footer     = (bool) ( $input['skip_footer']     ?? true );
+		$sideload_images = (bool) ( $input['sideload_images'] ?? true );
+		$dry_run         = (bool) ( $input['dry_run']         ?? false );
 
 		// Must have either page_id or title (unless dry_run — no page needed).
 		if ( ! $dry_run && $page_id <= 0 && '' === $title ) {
@@ -844,11 +849,12 @@ class Elementor_MCP_Design_Abilities {
 
 		// Run the importer.
 		$result = $this->importer->import( array(
-			'html'         => $html,
-			'url'          => $url,
-			'skip_header'  => $skip_header,
-			'skip_footer'  => $skip_footer,
-			'wrapper_class' => 'emcp-imported-page',
+			'html'            => $html,
+			'url'             => $url,
+			'skip_header'     => $skip_header,
+			'skip_footer'     => $skip_footer,
+			'sideload_images' => $sideload_images && ! $dry_run, // don't download files in dry-run
+			'wrapper_class'   => 'emcp-imported-page',
 		) );
 
 		if ( is_wp_error( $result ) ) {
@@ -857,14 +863,34 @@ class Elementor_MCP_Design_Abilities {
 
 		// Bind extracted CSS-var palette to Elementor Kit so color
 		// globals work out of the box (matches existing design-page flow).
-		$palette_globals = array();
-		if ( ! empty( $result['brand_tokens']['palette'] ) && class_exists( 'Elementor_MCP_Kit_Binder' ) ) {
+		$palette_globals    = array();
+		$typography_globals = array();
+		$import_slug        = 'emcp-import-' . substr( md5( serialize( $result['brand_tokens']['palette'] ?? array() ) ), 0, 7 );
+		if ( class_exists( 'Elementor_MCP_Kit_Binder' ) ) {
 			$binder = new \Elementor_MCP_Kit_Binder();
-			if ( method_exists( $binder, 'bind_palette_array' ) ) {
-				$palette_globals = $binder->bind_palette_array(
-					'emcp-import-' . substr( md5( serialize( $result['brand_tokens']['palette'] ) ), 0, 7 ),
-					$result['brand_tokens']['palette']
-				);
+			if ( ! empty( $result['brand_tokens']['palette'] ) && method_exists( $binder, 'bind_palette_array' ) ) {
+				$palette_globals = $binder->bind_palette_array( $import_slug, $result['brand_tokens']['palette'] );
+			}
+			// Phase C: also bind typography to kit system_typography slots.
+			if ( method_exists( $binder, 'bind_typography_array' ) ) {
+				$families = $this->typography_families_from_tokens( $result['brand_tokens']['typography'] ?? array() );
+				if ( ! empty( $families ) ) {
+					$typo = $binder->bind_typography_array( $import_slug, $families );
+					$typography_globals = $typo['globals'] ?? array();
+					// Overflow → unmapped_elements feedback.
+					if ( ! empty( $typo['overflow'] ) && ! $dry_run ) {
+						foreach ( $typo['overflow'] as $slot => $cfg ) {
+							$result['unmapped_elements'][] = array(
+								'tag'     => 'typography',
+								'class'   => $slot,
+								'id'      => '',
+								'snippet' => json_encode( $cfg ),
+								'reason'  => 'typography_slot_overflow',
+								'hint'    => 'Elementor Kit exposes only 4 system_typography slots (primary/secondary/text/accent). Additional font families need a custom theme stylesheet.',
+							);
+						}
+					}
+				}
 			}
 		}
 
@@ -885,6 +911,8 @@ class Elementor_MCP_Design_Abilities {
 				'native_widgets'       => (int) ( $stats_all['native_widgets']       ?? 0 ),
 				'html_fallbacks'       => (int) ( $stats_all['html_widgets']         ?? 0 ),
 				'accordions_collapsed' => (int) ( $stats_all['accordions_collapsed'] ?? 0 ),
+				'images_sideloaded'    => (int) ( $stats_all['images_sideloaded']    ?? 0 ),
+				'images_skipped'       => (int) ( $stats_all['images_skipped']       ?? 0 ),
 				'tokens_extracted'     => is_array( $result['tokens']['raw'] ?? null ) ? count( $result['tokens']['raw'] ) : 0,
 				'widget_coverage_pct'  => $metrics['widget_coverage_pct'],
 				'fidelity_hint'        => $metrics['fidelity_hint'],
@@ -928,8 +956,11 @@ class Elementor_MCP_Design_Abilities {
 			'native_widgets'       => (int) ( $stats_all['native_widgets']       ?? 0 ),
 			'html_fallbacks'       => (int) ( $stats_all['html_widgets']         ?? 0 ),
 			'accordions_collapsed' => (int) ( $stats_all['accordions_collapsed'] ?? 0 ),
-			'tokens_extracted'     => is_array( $result['tokens']['raw'] ?? null ) ? count( $result['tokens']['raw'] ) : 0,
-			'palette_bound_slots'  => count( $palette_globals ),
+			'images_sideloaded'    => (int) ( $stats_all['images_sideloaded']    ?? 0 ),
+			'images_skipped'       => (int) ( $stats_all['images_skipped']       ?? 0 ),
+			'tokens_extracted'       => is_array( $result['tokens']['raw'] ?? null ) ? count( $result['tokens']['raw'] ) : 0,
+			'palette_bound_slots'    => count( $palette_globals ),
+			'typography_bound_slots' => count( $typography_globals ),
 			// QW5: coarse fidelity signal — helps Claude decide if re-annotation pass is worth it.
 			'widget_coverage_pct'  => $metrics['widget_coverage_pct'],
 			'fidelity_hint'        => $metrics['fidelity_hint'],
@@ -941,6 +972,66 @@ class Elementor_MCP_Design_Abilities {
 			'unmapped_elements'    => $unmapped_all,
 			'needs_review'         => $metrics['needs_review'],
 		);
+	}
+
+	/**
+	 * Maps the extracted typography tokens into the `bind_typography_array`
+	 * input shape.  Token extractor gives `{families: {display:X, body:Y,…},
+	 * sizes: {display-xl:60px,…}}`; kit binder wants `{primary:{family,weight,size},
+	 * secondary, text, accent}`.
+	 *
+	 * Heuristic mapping (best-effort):
+	 *   display/heading/headline → primary
+	 *   body/paragraph/text      → text
+	 *   accent/mono/brand        → accent
+	 *   anything else            → secondary (first unclaimed slot) else overflow
+	 *
+	 * @param array $typography Extracted typography tokens.
+	 * @return array<string,array>
+	 */
+	private function typography_families_from_tokens( array $typography ): array {
+		if ( empty( $typography['families'] ) || ! is_array( $typography['families'] ) ) {
+			return array();
+		}
+		$out  = array();
+		$used = array();
+		$map  = array(
+			'primary'   => array( 'display', 'heading', 'headline', 'title', 'h1' ),
+			'text'      => array( 'body', 'paragraph', 'text', 'sans', 'p' ),
+			'accent'    => array( 'accent', 'mono', 'brand', 'code' ),
+			'secondary' => array( 'secondary', 'sub', 'caption', 'meta' ),
+		);
+		foreach ( $typography['families'] as $key => $family ) {
+			$slug = strtolower( (string) $key );
+			foreach ( $map as $slot => $needles ) {
+				if ( isset( $out[ $slot ] ) ) {
+					continue;
+				}
+				foreach ( $needles as $n ) {
+					if ( false !== strpos( $slug, $n ) ) {
+						$out[ $slot ] = array( 'family' => (string) $family );
+						$used[ $key ] = true;
+						break 2;
+					}
+				}
+			}
+		}
+		// Fill remaining slots with any leftover families.
+		$slots_left = array_diff( array( 'primary', 'secondary', 'text', 'accent' ), array_keys( $out ) );
+		foreach ( $typography['families'] as $key => $family ) {
+			if ( isset( $used[ $key ] ) ) {
+				continue;
+			}
+			if ( empty( $slots_left ) ) {
+				// Keep as-is so caller can push to overflow.
+				$out[ $key ] = array( 'family' => (string) $family );
+				continue;
+			}
+			$slot        = array_shift( $slots_left );
+			$out[ $slot ] = array( 'family' => (string) $family );
+			$used[ $key ] = true;
+		}
+		return $out;
 	}
 
 	/**

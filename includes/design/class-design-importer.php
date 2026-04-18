@@ -72,15 +72,29 @@ class Elementor_MCP_Design_Importer {
 			return new \WP_Error( 'emcp_import_empty', __( 'Design HTML is empty.', 'elementor-mcp' ) );
 		}
 
-		$skip_header   = (bool) ( $input['skip_header']   ?? true );
-		$skip_footer   = (bool) ( $input['skip_footer']   ?? true );
-		$wrapper_class = (string) ( $input['wrapper_class'] ?? 'emcp-imported-page' );
+		$skip_header     = (bool) ( $input['skip_header']     ?? true );
+		$skip_footer     = (bool) ( $input['skip_footer']     ?? true );
+		$sideload_images = (bool) ( $input['sideload_images'] ?? true );
+		$wrapper_class   = (string) ( $input['wrapper_class'] ?? 'emcp-imported-page' );
 
 		// 1. Tokens from <style> :root vars.
 		$style_block = $this->extract_style_block( $html );
 		$tokens      = function_exists( 'emcp_tokens_css_var_extract' )
 			? emcp_tokens_css_var_extract( $style_block )
 			: array( 'palette' => array(), 'typography' => array( 'families' => array(), 'sizes' => array() ), 'raw' => array() );
+
+		// Phase C: publish --css-var → value map so inline-style-parser resolves var() / rgba(var()).
+		if ( function_exists( 'emcp_inline_style_current_vars' ) ) {
+			$raw_vars = array();
+			if ( isset( $tokens['raw'] ) && is_array( $tokens['raw'] ) ) {
+				foreach ( $tokens['raw'] as $name => $value ) {
+					// Ensure `--` prefix on keys for direct lookup by the resolver.
+					$key              = ( 0 === strpos( (string) $name, '--' ) ) ? $name : '--' . ltrim( (string) $name, '-' );
+					$raw_vars[ $key ] = (string) $value;
+				}
+			}
+			emcp_inline_style_current_vars( $raw_vars );
+		}
 
 		// 2. DOMDocument parse.
 		$dom = new \DOMDocument();
@@ -101,8 +115,25 @@ class Elementor_MCP_Design_Importer {
 			'html_widgets'         => 0,
 			'native_widgets'       => 0,
 			'accordions_collapsed' => 0,
+			'images_sideloaded'    => 0,
+			'images_skipped'       => 0,
 			'unmapped_elements'    => array(), // Layer 3: elements that fell to html-widget fallback.
 		);
+
+		// Phase C: sideload external images → WP media library, rewrite src + stamp attachment ID.
+		if ( $sideload_images ) {
+			$this->sideload_external_images( $dom, $stats );
+		}
+
+		// Phase C: build CSS class-rule map from <style> block + publish to ambient accessor.
+		//         Extractors (container, heading, etc.) read it to merge class styles into settings.
+		$rule_map = array();
+		if ( '' !== trim( $style_block ) && function_exists( 'emcp_css_build_rule_map' ) ) {
+			$rule_map = emcp_css_build_rule_map( $style_block );
+		}
+		if ( function_exists( 'emcp_css_current_rule_map' ) ) {
+			emcp_css_current_rule_map( $rule_map );
+		}
 
 		// QW4: track <style> class rules that won't be applied until Phase C's resolver ships.
 		//      Surfaces gap #3 ("class rules silently dropped") to Claude via unmapped_elements.
@@ -168,7 +199,7 @@ class Elementor_MCP_Design_Importer {
 			'children' => $top_level_nodes,
 		);
 
-		return array(
+		$return = array(
 			'structure'         => array( $wrapper ),
 			'brand_tokens'      => array(
 				'palette'    => $tokens['palette'],
@@ -179,6 +210,16 @@ class Elementor_MCP_Design_Importer {
 			'stats'             => $stats,
 			'unmapped_elements' => $stats['unmapped_elements'], // Layer 3: Claude reads this to re-annotate.
 		);
+
+		// Clear ambient rule map + var map so a second import() call starts fresh.
+		if ( function_exists( 'emcp_css_current_rule_map' ) ) {
+			emcp_css_current_rule_map( null );
+		}
+		if ( function_exists( 'emcp_inline_style_current_vars' ) ) {
+			emcp_inline_style_current_vars( null );
+		}
+
+		return $return;
 	}
 
 	/**
@@ -375,6 +416,98 @@ class Elementor_MCP_Design_Importer {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Pre-pass: download every external `<img src="http(s)://…">` to the WP
+	 * media library, rewrite `src` to the local URL, stamp `data-emcp-attachment-id`
+	 * so the image extractor can use it.
+	 *
+	 * Non-fatal on failure — adds `unmapped_elements` entry + bumps `images_skipped`.
+	 */
+	private function sideload_external_images( \DOMDocument $dom, array &$stats ): void {
+		if ( ! function_exists( 'media_handle_sideload' ) ) {
+			if ( defined( 'ABSPATH' ) && is_dir( ABSPATH . 'wp-admin/includes' ) ) {
+				require_once ABSPATH . 'wp-admin/includes/file.php';
+				require_once ABSPATH . 'wp-admin/includes/media.php';
+				require_once ABSPATH . 'wp-admin/includes/image.php';
+			} else {
+				return; // no WP — running in CLI test harness, skip silently
+			}
+		}
+
+		$home_host = '';
+		if ( function_exists( 'home_url' ) ) {
+			$parts     = wp_parse_url( home_url() );
+			$home_host = strtolower( $parts['host'] ?? '' );
+		}
+
+		foreach ( $dom->getElementsByTagName( 'img' ) as $img ) {
+			if ( ! $img instanceof \DOMElement ) {
+				continue;
+			}
+			$src = $img->getAttribute( 'src' );
+			if ( '' === $src || 0 === strpos( $src, 'data:' ) ) {
+				continue;
+			}
+			if ( ! preg_match( '#^https?://#i', $src ) ) {
+				continue; // relative or data URI
+			}
+			$parts = wp_parse_url( $src );
+			$host  = strtolower( $parts['host'] ?? '' );
+			if ( '' !== $home_host && $host === $home_host ) {
+				continue; // already local
+			}
+
+			$tmp = download_url( $src, 20 );
+			if ( is_wp_error( $tmp ) ) {
+				$stats['images_skipped']++;
+				$stats['unmapped_elements'][] = array(
+					'tag'     => 'img',
+					'class'   => $img->getAttribute( 'class' ),
+					'id'      => $img->getAttribute( 'id' ),
+					'snippet' => substr( $src, 0, 300 ),
+					'reason'  => 'image_sideload_failed',
+					'hint'    => 'download_url failed: ' . $tmp->get_error_message() . '. Image left external.',
+				);
+				continue;
+			}
+			$url_path = wp_parse_url( $src, PHP_URL_PATH );
+			$filename = $url_path ? basename( $url_path ) : 'image.jpg';
+			if ( ! preg_match( '/\.\w+$/', $filename ) ) {
+				$filename .= '.jpg';
+			}
+			$file_array = array(
+				'name'     => sanitize_file_name( $filename ),
+				'tmp_name' => $tmp,
+			);
+			$attachment_id = media_handle_sideload( $file_array, 0 );
+			if ( is_wp_error( $attachment_id ) ) {
+				if ( file_exists( $tmp ) ) {
+					wp_delete_file( $tmp );
+				}
+				$stats['images_skipped']++;
+				$stats['unmapped_elements'][] = array(
+					'tag'     => 'img',
+					'class'   => $img->getAttribute( 'class' ),
+					'id'      => $img->getAttribute( 'id' ),
+					'snippet' => substr( $src, 0, 300 ),
+					'reason'  => 'image_sideload_failed',
+					'hint'    => 'media_handle_sideload failed: ' . $attachment_id->get_error_message(),
+				);
+				continue;
+			}
+			$alt = $img->getAttribute( 'alt' );
+			if ( '' !== $alt ) {
+				update_post_meta( $attachment_id, '_wp_attachment_image_alt', $alt );
+			}
+			$local_url = wp_get_attachment_url( $attachment_id );
+			if ( $local_url ) {
+				$img->setAttribute( 'src', $local_url );
+			}
+			$img->setAttribute( 'data-emcp-attachment-id', (string) $attachment_id );
+			$stats['images_sideloaded']++;
+		}
 	}
 
 	private function extract_style_block( string $html ): string {

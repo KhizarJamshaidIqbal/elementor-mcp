@@ -259,6 +259,97 @@ if ( ! function_exists( 'emcp_parse_inline_styles' ) ) {
 	}
 }
 
+if ( ! function_exists( 'emcp_inline_style_current_vars' ) ) {
+	/**
+	 * Ambient accessor for the current import's `--css-var → value` map.
+	 * Design_Importer publishes extracted :root vars here; the parser
+	 * consults the map to resolve `var(--name)` + `rgba(var(--x)/alpha)` usages.
+	 *
+	 * @param array|null|false $set Array = setter; null = clear; false = get (default).
+	 * @return array<string,string>
+	 */
+	function emcp_inline_style_current_vars( $set = false ): array {
+		static $vars = array();
+		if ( is_array( $set ) ) {
+			$vars = $set;
+		} elseif ( null === $set ) {
+			$vars = array();
+		}
+		return $vars;
+	}
+}
+
+if ( ! function_exists( 'emcp_style_resolve_functions' ) ) {
+	/**
+	 * Resolves CSS functions (`var()`, `calc()`, `rgba(var())`) inside a value
+	 * string so the property-matching regex downstream sees plain tokens.
+	 *
+	 * @param string $val Raw CSS value.
+	 * @return string Resolved value (may still be original if unresolvable).
+	 */
+	function emcp_style_resolve_functions( string $val ): string {
+		$vars = function_exists( 'emcp_inline_style_current_vars' ) ? emcp_inline_style_current_vars() : array();
+
+		// rgba(var(--x)/alpha) or rgba(var(--x), alpha) — resolve var to hex then expand to rgba.
+		$val = preg_replace_callback(
+			'/rgba?\(\s*var\(\s*(--[A-Za-z0-9_-]+)\s*\)\s*[\/,]\s*([\d.]+)\s*\)/i',
+			static function ( $m ) use ( $vars ) {
+				$resolved = $vars[ $m[1] ] ?? null;
+				$alpha    = (float) $m[2];
+				if ( null === $resolved ) {
+					return $m[0];
+				}
+				$resolved = trim( $resolved );
+				if ( preg_match( '/^#([A-Fa-f0-9]{6})$/', $resolved, $hex ) ) {
+					$r = hexdec( substr( $hex[1], 0, 2 ) );
+					$g = hexdec( substr( $hex[1], 2, 2 ) );
+					$b = hexdec( substr( $hex[1], 4, 2 ) );
+					return sprintf( 'rgba(%d,%d,%d,%s)', $r, $g, $b, rtrim( rtrim( sprintf( '%.3f', $alpha ), '0' ), '.' ) );
+				}
+				return $m[0];
+			},
+			$val
+		) ?? $val;
+
+		// var(--x) — 8-level depth cap prevents cycle.
+		for ( $depth = 0; $depth < 8; $depth++ ) {
+			if ( false === stripos( $val, 'var(' ) ) {
+				break;
+			}
+			$replaced = preg_replace_callback(
+				'/var\(\s*(--[A-Za-z0-9_-]+)(?:\s*,\s*([^)]+))?\s*\)/i',
+				static function ( $m ) use ( $vars ) {
+					$name     = $m[1];
+					$fallback = isset( $m[2] ) ? trim( $m[2] ) : '';
+					if ( isset( $vars[ $name ] ) && '' !== trim( $vars[ $name ] ) ) {
+						return trim( $vars[ $name ] );
+					}
+					if ( '' !== $fallback ) {
+						return $fallback;
+					}
+					return $m[0]; // leave unresolved var as-is
+				},
+				$val
+			);
+			if ( $replaced === $val ) {
+				break;
+			}
+			$val = $replaced;
+		}
+
+		// calc(Nunit) single-term passthrough: `calc(24px)` → `24px`.
+		$val = preg_replace_callback(
+			'/calc\(\s*([-\d.]+\s*(?:px|em|rem|%|vw|vh|vmin|vmax)?)\s*\)/i',
+			static function ( $m ) {
+				return trim( $m[1] );
+			},
+			$val
+		) ?? $val;
+
+		return $val;
+	}
+}
+
 if ( ! function_exists( 'emcp_style_parse_props' ) ) {
 	/**
 	 * Parses a raw CSS `style` attribute string into a key→value map.
@@ -288,6 +379,10 @@ if ( ! function_exists( 'emcp_style_parse_props' ) ) {
 			$value = trim( substr( $part, $colon + 1 ) );
 			// Strip trailing `!important` — Elementor controls apply their own priority.
 			$value = preg_replace( '/\s*!\s*important\s*$/i', '', $value );
+			// Resolve var() / calc() / rgba(var()) → plain tokens.
+			if ( function_exists( 'emcp_style_resolve_functions' ) ) {
+				$value = emcp_style_resolve_functions( (string) $value );
+			}
 			if ( '' !== $key ) {
 				$result[ $key ] = $value;
 			}

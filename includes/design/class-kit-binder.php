@@ -112,6 +112,110 @@ class Elementor_MCP_Kit_Binder {
 	}
 
 	/**
+	 * Binds an inline typography array into the active kit's system_typography.
+	 * Mirrors `bind_palette_array()` semantics (dedupe by title, append-only).
+	 *
+	 * Input families array expects slot name → settings map:
+	 *   [
+	 *     'primary'   => ['family'=>'Playfair Display','weight'=>'700','size'=>'60'],
+	 *     'secondary' => ['family'=>'Inter','weight'=>'400','size'=>'18'],
+	 *     'text'      => [...],
+	 *     'accent'    => [...],
+	 *   ]
+	 * Elementor Kit exposes exactly 4 system_typography slots. Overflow
+	 * slots are returned as an 'overflow' array so Design_Importer can
+	 * surface them via unmapped_elements (reason: typography_slot_overflow).
+	 *
+	 * @since 1.6.0
+	 *
+	 * @param string               $name     Typography set identifier (dedupe prefix).
+	 * @param array<string, array> $families Slot name → {family, weight?, size?, line_height?, letter_spacing?}.
+	 * @return array{globals:array<string,string>,overflow:array<string,array>}
+	 */
+	public function bind_typography_array( string $name, array $families ): array {
+		$result = array( 'globals' => array(), 'overflow' => array() );
+		if ( empty( $name ) || empty( $families ) ) {
+			return $result;
+		}
+
+		$kit = $this->get_active_kit();
+		if ( ! $kit ) {
+			return $result;
+		}
+
+		$settings   = $kit->get_settings();
+		$typography = is_array( $settings['system_typography'] ?? null ) ? $settings['system_typography'] : array();
+		$index      = $this->index_colors_by_title( $typography );
+
+		$slot_order = array( 'primary', 'secondary', 'text', 'accent' );
+		$appended   = false;
+
+		foreach ( $slot_order as $slot ) {
+			if ( ! isset( $families[ $slot ] ) ) {
+				continue;
+			}
+			$title = $this->slot_title( $name, $slot );
+
+			if ( isset( $index[ $title ] ) ) {
+				$result['globals'][ $slot ] = $index[ $title ]['_id'];
+				continue;
+			}
+
+			$family_settings = $families[ $slot ];
+			$new_id = substr( md5( $name . '_type_' . $slot ), 0, 7 );
+			$entry  = array(
+				'_id'                   => $new_id,
+				'title'                 => $title,
+				'typography_typography' => 'custom',
+			);
+			if ( isset( $family_settings['family'] ) && '' !== $family_settings['family'] ) {
+				$entry['typography_font_family'] = (string) $family_settings['family'];
+			}
+			if ( isset( $family_settings['weight'] ) && '' !== $family_settings['weight'] ) {
+				$entry['typography_font_weight'] = (string) $family_settings['weight'];
+			}
+			if ( isset( $family_settings['size'] ) && '' !== $family_settings['size'] ) {
+				$entry['typography_font_size'] = array(
+					'unit'  => 'px',
+					'size'  => (float) $family_settings['size'],
+					'sizes' => array(),
+				);
+			}
+			if ( isset( $family_settings['line_height'] ) && '' !== $family_settings['line_height'] ) {
+				$entry['typography_line_height'] = array(
+					'unit'  => 'em',
+					'size'  => (float) $family_settings['line_height'],
+					'sizes' => array(),
+				);
+			}
+			if ( isset( $family_settings['letter_spacing'] ) && '' !== $family_settings['letter_spacing'] ) {
+				$entry['typography_letter_spacing'] = array(
+					'unit'  => 'px',
+					'size'  => (float) $family_settings['letter_spacing'],
+					'sizes' => array(),
+				);
+			}
+			$typography[]               = $entry;
+			$result['globals'][ $slot ] = $new_id;
+			$appended                   = true;
+		}
+
+		// Overflow: slot names outside the 4 fixed slots → caller handles.
+		foreach ( $families as $slot => $cfg ) {
+			if ( ! in_array( $slot, $slot_order, true ) ) {
+				$result['overflow'][ $slot ] = $cfg;
+			}
+		}
+
+		if ( $appended ) {
+			$settings['system_typography'] = $typography;
+			$this->save_kit_settings( $kit, $settings );
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Returns the active Elementor Kit document, or null.
 	 */
 	private function get_active_kit() {

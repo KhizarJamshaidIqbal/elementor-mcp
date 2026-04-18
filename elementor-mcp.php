@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'ELEMENTOR_MCP_VERSION', '1.5.1' );
+define( 'ELEMENTOR_MCP_VERSION', '1.6.0' );
 define( 'ELEMENTOR_MCP_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ELEMENTOR_MCP_URL', plugin_dir_url( __FILE__ ) );
 define( 'ELEMENTOR_MCP_BASENAME', plugin_basename( __FILE__ ) );
@@ -187,6 +187,7 @@ function elementor_mcp_init(): void {
 	require_once ELEMENTOR_MCP_DIR . 'includes/design/helpers/array-merge.php';
 	require_once ELEMENTOR_MCP_DIR . 'includes/design/helpers/responsive.php';
 	require_once ELEMENTOR_MCP_DIR . 'includes/design/helpers/inline-style-parser.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/helpers/css-rule-resolver.php';
 	require_once ELEMENTOR_MCP_DIR . 'includes/design/tokens/palettes.php';
 	require_once ELEMENTOR_MCP_DIR . 'includes/design/tokens/typography.php';
 	require_once ELEMENTOR_MCP_DIR . 'includes/design/tokens/spacing.php';

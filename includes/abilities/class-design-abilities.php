@@ -891,6 +891,8 @@ class Elementor_MCP_Design_Abilities {
 
 		$stats = $result['stats'] ?? array();
 
+		$unmapped = $result['unmapped_elements'] ?? array();
+
 		return array(
 			'post_id'              => $page_id,
 			'edit_url'             => admin_url( 'post.php?post=' . $page_id . '&action=elementor' ),
@@ -902,6 +904,12 @@ class Elementor_MCP_Design_Abilities {
 			'accordions_collapsed' => (int) ( $stats['accordions_collapsed'] ?? 0 ),
 			'tokens_extracted'     => is_array( $result['tokens']['raw'] ?? null ) ? count( $result['tokens']['raw'] ) : 0,
 			'palette_bound_slots'  => count( $palette_globals ),
+			// Layer 3: Claude reads unmapped_elements to decide if re-annotation is needed.
+			// Each entry: {tag, class, id, snippet (≤300 chars), reason, hint}.
+			// reason = 'no_rule_leaf' → add data-emcp-widget attr and re-import.
+			// reason = 'forced_html_rule' → form/svg/iframe, expected — no action needed.
+			'unmapped_elements'    => $unmapped,
+			'needs_review'         => count( array_filter( $unmapped, fn( $u ) => 'no_rule_leaf' === $u['reason'] ) ) > 0,
 		);
 	}
 }

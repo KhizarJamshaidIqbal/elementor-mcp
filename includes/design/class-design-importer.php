@@ -101,6 +101,7 @@ class Elementor_MCP_Design_Importer {
 			'html_widgets'         => 0,
 			'native_widgets'       => 0,
 			'accordions_collapsed' => 0,
+			'unmapped_elements'    => array(), // Layer 3: elements that fell to html-widget fallback.
 		);
 
 		// 3. Walk body children.
@@ -136,14 +137,15 @@ class Elementor_MCP_Design_Importer {
 		);
 
 		return array(
-			'structure'    => array( $wrapper ),
-			'brand_tokens' => array(
+			'structure'         => array( $wrapper ),
+			'brand_tokens'      => array(
 				'palette'    => $tokens['palette'],
 				'typography' => $tokens['typography'],
 			),
-			'tokens'       => $tokens,
-			'css'          => $style_block,
-			'stats'        => $stats,
+			'tokens'            => $tokens,
+			'css'               => $style_block,
+			'stats'             => $stats,
+			'unmapped_elements' => $stats['unmapped_elements'], // Layer 3: Claude reads this to re-annotate.
 		);
 	}
 
@@ -158,6 +160,14 @@ class Elementor_MCP_Design_Importer {
 				return $this->walk_as_container( $el, $stats );
 			}
 			$stats['html_widgets']++;
+			$stats['unmapped_elements'][] = array(
+				'tag'     => $el->tagName,
+				'class'   => $el->getAttribute( 'class' ),
+				'id'      => $el->getAttribute( 'id' ),
+				'snippet' => substr( $el->ownerDocument->saveHTML( $el ), 0, 300 ),
+				'reason'  => 'no_rule_leaf',
+				'hint'    => 'Add data-emcp-widget="[widget_type]" to force a mapping.',
+			);
 			return array(
 				'type'        => 'widget',
 				'widget_type' => 'html',
@@ -175,6 +185,14 @@ class Elementor_MCP_Design_Importer {
 		$wtype     = $extracted['widget_type'] ?? 'html';
 		if ( 'html' === $wtype ) {
 			$stats['html_widgets']++;
+			$stats['unmapped_elements'][] = array(
+				'tag'     => $el->tagName,
+				'class'   => $el->getAttribute( 'class' ),
+				'id'      => $el->getAttribute( 'id' ),
+				'snippet' => substr( $el->ownerDocument->saveHTML( $el ), 0, 300 ),
+				'reason'  => 'forced_html_rule',
+				'hint'    => 'Rule matched but extractor returned html widget (form/svg/iframe — expected).',
+			);
 		} else {
 			$stats['native_widgets']++;
 		}

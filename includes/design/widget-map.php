@@ -96,14 +96,60 @@ if ( ! function_exists( 'emcp_design_widget_map' ) ) {
 				'extractor'   => 'emcp_design_extractor_paragraph',
 			),
 
-			// 9. Interactive/opaque content → HTML fallback.
+			// 9. Unordered / ordered list → icon-list (li items, FA check icon default).
+			array(
+				'match'       => array( 'tag_in' => array( 'ul', 'ol' ) ),
+				'widget_type' => 'icon-list',
+				'extractor'   => 'emcp_design_extractor_list',
+			),
+
+			// 10. Definition list → icon-list (dt: label, dd: value pairs).
+			array(
+				'match'       => array( 'tag' => 'dl' ),
+				'widget_type' => 'icon-list',
+				'extractor'   => 'emcp_design_extractor_dl',
+			),
+
+			// 11. Figure containing image → image widget (preserves figcaption).
+			array(
+				'match'       => array( 'tag' => 'figure', 'has_child_tag' => 'img' ),
+				'widget_type' => 'image',
+				'extractor'   => 'emcp_design_extractor_figure',
+			),
+
+			// 12. Blockquote → rich text-editor.
+			array(
+				'match'       => array( 'tag' => 'blockquote' ),
+				'widget_type' => 'text-editor',
+				'extractor'   => 'emcp_design_extractor_blockquote',
+			),
+
+			// 13. Stat / counter elements → counter widget (extracts numeric value).
+			array(
+				'match'       => array( 'class_pattern' => '/\b(counter|stat-value|stat__value|odometer|number-count)\b/' ),
+				'widget_type' => 'counter',
+				'extractor'   => 'emcp_design_extractor_counter',
+			),
+
+			// 14. Wrapper with SINGLE <img> child → image widget (avoids pointless container).
+			array(
+				'match'       => array(
+					'tag_in'              => array( 'div', 'span', 'picture', 'figure' ),
+					'has_child_tag'       => 'img',
+					'only_child_elements' => 1,
+				),
+				'widget_type' => 'image',
+				'extractor'   => 'emcp_design_extractor_wrapped_image',
+			),
+
+			// 15. Interactive/opaque content → HTML fallback.
 			array(
 				'match'       => array( 'tag_in' => array( 'form', 'svg', 'script', 'iframe' ) ),
 				'widget_type' => 'html',
 				'extractor'   => 'emcp_design_extractor_outer_html',
 			),
 
-			// 10. Container — structural wrappers, children walked recursively.
+			// 16. Container — structural wrappers, children walked recursively.
 			array(
 				'match'       => array( 'tag_in' => array( 'section', 'div', 'aside', 'header', 'footer', 'main', 'article' ) ),
 				'widget_type' => 'container',
@@ -306,6 +352,150 @@ if ( ! function_exists( 'emcp_design_extractor_container' ) ) {
 	}
 }
 
+if ( ! function_exists( 'emcp_design_extractor_list' ) ) {
+	/**
+	 * <ul>/<ol> → icon-list. Each <li> becomes one item.
+	 * Links inside <li> preserved. FA check icon as default if no icon found.
+	 */
+	function emcp_design_extractor_list( \DOMElement $el ): array {
+		$items = array();
+		$i     = 0;
+		foreach ( $el->getElementsByTagName( 'li' ) as $li ) {
+			// Only direct li children, not nested.
+			if ( $li->parentNode !== $el ) {
+				continue;
+			}
+			$a    = emcp_design_first_child_tag( $li, array( 'a' ) );
+			$text = $a ? trim( $a->textContent ) : trim( $li->textContent );
+			$href = $a ? $a->getAttribute( 'href' ) : '';
+			$icon = emcp_design_find_icon_class( $li );
+			$lib  = emcp_design_icon_library( $icon );
+			$items[] = array(
+				'text'          => $text,
+				'link'          => array( 'url' => $href, 'is_external' => '', 'nofollow' => '' ),
+				'selected_icon' => $icon
+					? array( 'value' => $icon, 'library' => $lib )
+					: array( 'value' => 'fas fa-check', 'library' => 'fa-solid' ),
+				'_id'           => 'li' . $i++,
+			);
+		}
+		return array(
+			'widget_type' => 'icon-list',
+			'settings'    => array(
+				'icon_list'    => $items,
+				'_css_classes' => $el->getAttribute( 'class' ),
+			),
+		);
+	}
+}
+
+if ( ! function_exists( 'emcp_design_extractor_dl' ) ) {
+	/**
+	 * <dl> → icon-list. Paired <dt>/<dd> → "dt: dd" text per item.
+	 */
+	function emcp_design_extractor_dl( \DOMElement $el ): array {
+		$items = array();
+		$dts   = $el->getElementsByTagName( 'dt' );
+		$dds   = $el->getElementsByTagName( 'dd' );
+		$len   = min( $dts->length, $dds->length );
+		for ( $j = 0; $j < $len; $j++ ) {
+			$items[] = array(
+				'text'          => trim( $dts->item( $j )->textContent ) . ': ' . trim( $dds->item( $j )->textContent ),
+				'link'          => array( 'url' => '', 'is_external' => '', 'nofollow' => '' ),
+				'selected_icon' => array( 'value' => 'fas fa-circle-check', 'library' => 'fa-solid' ),
+				'_id'           => 'dl' . $j,
+			);
+		}
+		return array(
+			'widget_type' => 'icon-list',
+			'settings'    => array(
+				'icon_list'    => $items,
+				'_css_classes' => $el->getAttribute( 'class' ),
+			),
+		);
+	}
+}
+
+if ( ! function_exists( 'emcp_design_extractor_figure' ) ) {
+	/**
+	 * <figure> → image widget. Reads <img> src/alt + optional <figcaption>.
+	 */
+	function emcp_design_extractor_figure( \DOMElement $el ): array {
+		$img     = emcp_design_first_child_tag( $el, array( 'img' ) );
+		$caption = emcp_design_first_child_tag( $el, array( 'figcaption' ) );
+		return array(
+			'widget_type' => 'image',
+			'settings'    => array(
+				'image'        => array(
+					'url' => $img ? $img->getAttribute( 'src' ) : '',
+					'id'  => 0,
+					'alt' => $img ? $img->getAttribute( 'alt' ) : '',
+				),
+				'caption_source' => $caption ? 'custom' : 'none',
+				'caption'        => $caption ? trim( $caption->textContent ) : '',
+				'_css_classes'   => $el->getAttribute( 'class' ),
+			),
+		);
+	}
+}
+
+if ( ! function_exists( 'emcp_design_extractor_blockquote' ) ) {
+	/**
+	 * <blockquote> → text-editor with blockquote HTML preserved.
+	 */
+	function emcp_design_extractor_blockquote( \DOMElement $el ): array {
+		return array(
+			'widget_type' => 'text-editor',
+			'settings'    => array(
+				'editor'       => '<blockquote>' . emcp_design_inner_html( $el ) . '</blockquote>',
+				'_css_classes' => $el->getAttribute( 'class' ),
+			),
+		);
+	}
+}
+
+if ( ! function_exists( 'emcp_design_extractor_counter' ) ) {
+	/**
+	 * Stat/counter element → Elementor counter widget.
+	 * Strips non-numeric chars to get ending_number; remainder becomes suffix.
+	 */
+	function emcp_design_extractor_counter( \DOMElement $el ): array {
+		$raw    = trim( $el->textContent );
+		$num    = (int) preg_replace( '/[^0-9]/', '', $raw );
+		$suffix = trim( preg_replace( '/[0-9]/', '', $raw ) );
+		return array(
+			'widget_type' => 'counter',
+			'settings'    => array(
+				'starting_number' => 0,
+				'ending_number'   => $num > 0 ? $num : 100,
+				'suffix'          => $suffix,
+				'_css_classes'    => $el->getAttribute( 'class' ),
+			),
+		);
+	}
+}
+
+if ( ! function_exists( 'emcp_design_extractor_wrapped_image' ) ) {
+	/**
+	 * Wrapper element (div/span/picture) whose sole element child is <img>.
+	 * Promotes the inner image instead of creating a pointless container.
+	 */
+	function emcp_design_extractor_wrapped_image( \DOMElement $el ): array {
+		$img = emcp_design_first_child_tag( $el, array( 'img' ) );
+		return array(
+			'widget_type' => 'image',
+			'settings'    => array(
+				'image'        => array(
+					'url' => $img ? $img->getAttribute( 'src' ) : '',
+					'id'  => 0,
+					'alt' => $img ? $img->getAttribute( 'alt' ) : '',
+				),
+				'_css_classes' => $el->getAttribute( 'class' ),
+			),
+		);
+	}
+}
+
 /* ═════════════════════════════════════════════════════════════════
    DOM HELPERS
    ═════════════════════════════════════════════════════════════════ */
@@ -405,6 +595,18 @@ if ( ! function_exists( 'emcp_design_match_rule' ) ) {
 		}
 		if ( isset( $match['has_data_attr'] ) && ! $el->hasAttribute( 'data-' . $match['has_data_attr'] ) ) {
 			return false;
+		}
+		// only_child_elements: element must have exactly N direct DOMElement children.
+		if ( isset( $match['only_child_elements'] ) ) {
+			$count = 0;
+			foreach ( $el->childNodes as $c ) {
+				if ( $c instanceof \DOMElement ) {
+					$count++;
+				}
+			}
+			if ( $count !== (int) $match['only_child_elements'] ) {
+				return false;
+			}
 		}
 		return true;
 	}

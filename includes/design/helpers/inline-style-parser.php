@@ -286,6 +286,8 @@ if ( ! function_exists( 'emcp_style_parse_props' ) ) {
 			}
 			$key   = strtolower( trim( substr( $part, 0, $colon ) ) );
 			$value = trim( substr( $part, $colon + 1 ) );
+			// Strip trailing `!important` — Elementor controls apply their own priority.
+			$value = preg_replace( '/\s*!\s*important\s*$/i', '', $value );
 			if ( '' !== $key ) {
 				$result[ $key ] = $value;
 			}

@@ -104,6 +104,22 @@ class Elementor_MCP_Design_Importer {
 			'unmapped_elements'    => array(), // Layer 3: elements that fell to html-widget fallback.
 		);
 
+		// QW4: track <style> class rules that won't be applied until Phase C's resolver ships.
+		//      Surfaces gap #3 ("class rules silently dropped") to Claude via unmapped_elements.
+		if ( '' !== trim( $style_block ) ) {
+			$class_rules = $this->extract_class_rules( $style_block );
+			foreach ( $class_rules as $selector => $declarations ) {
+				$stats['unmapped_elements'][] = array(
+					'tag'     => 'style',
+					'class'   => $selector,
+					'id'      => '',
+					'snippet' => substr( $selector . '{' . $declarations . '}', 0, 300 ),
+					'reason'  => 'css_rule_unresolved',
+					'hint'    => 'Class rules from <style> blocks are not yet merged into widget settings. Inline style="…" on the matching element works today.',
+				);
+			}
+		}
+
 		// 3. Walk body children.
 		$top_level_nodes = array();
 		foreach ( $body->childNodes as $child ) {
@@ -123,16 +139,32 @@ class Elementor_MCP_Design_Importer {
 		$top_level_nodes = $this->collapse_accordion_siblings( $top_level_nodes, $stats );
 
 		// 5. Wrap everything in an outer container carrying the CSS scope class.
+		//    QW1: only force padding=0/flex_gap=0 when <body> has NO inline style.
+		//    When body has inline styles, parse them so spacing intent is preserved.
+		$body_style   = $body->getAttribute( 'style' );
+		$body_parsed  = ( '' !== trim( $body_style ) && function_exists( 'emcp_parse_inline_styles' ) )
+			? emcp_parse_inline_styles( $body_style )
+			: array();
+		$wrap_settings = array(
+			'content_width'  => 'full',
+			'flex_direction' => 'column',
+			'_title'         => 'Imported design wrapper',
+			'css_classes'    => $wrapper_class,
+		);
+		if ( empty( $body_parsed ) ) {
+			// No body-level styling supplied → safe to reset spacing so importer output
+			// doesn't pick up a theme default. Existing behaviour.
+			$wrap_settings['padding']  = array( 'unit' => 'px', 'top' => '0', 'right' => '0', 'bottom' => '0', 'left' => '0', 'isLinked' => true );
+			$wrap_settings['flex_gap'] = array( 'unit' => 'px', 'size' => 0, 'column' => '0', 'row' => '0', 'isLinked' => true );
+		} else {
+			// Body has inline style → merge parsed values (background_color / padding / etc.)
+			$wrap_settings = array_merge( $wrap_settings, $body_parsed );
+			// Preserve the wrapper class even if body style accidentally set css_classes.
+			$wrap_settings['css_classes'] = $wrapper_class;
+		}
 		$wrapper = array(
 			'type'     => 'container',
-			'settings' => array(
-				'content_width'  => 'full',
-				'flex_direction' => 'column',
-				'padding'        => array( 'unit' => 'px', 'top' => '0', 'right' => '0', 'bottom' => '0', 'left' => '0', 'isLinked' => true ),
-				'flex_gap'       => array( 'unit' => 'px', 'size' => 0, 'column' => '0', 'row' => '0', 'isLinked' => true ),
-				'_title'         => 'Imported design wrapper',
-				'css_classes'    => $wrapper_class,
-			),
+			'settings' => $wrap_settings,
 			'children' => $top_level_nodes,
 		);
 
@@ -350,6 +382,38 @@ class Elementor_MCP_Design_Importer {
 			return $m[1];
 		}
 		return '';
+	}
+
+	/**
+	 * Extracts class-selector rules from a CSS block into a map.
+	 *
+	 * Deliberately naive regex tokenizer — skips `:root`, `@media`, `@supports`,
+	 * element selectors, and pseudo-classes. Goal is to surface the MAGNITUDE
+	 * of dropped styling so Claude knows to add matching inline styles.
+	 *
+	 * @param string $css Raw CSS text.
+	 * @return array<string,string> Selector → declarations block (inner text).
+	 */
+	private function extract_class_rules( string $css ): array {
+		$out = array();
+		// Strip comments + :root block so they don't pollute the match.
+		$css = preg_replace( '#/\*.*?\*/#s', '', $css );
+		$css = preg_replace( '#:root\s*\{[^}]*\}#s', '', (string) $css );
+		// Strip @-rules (media/supports/keyframes) for now — they bring their own parsing cost.
+		$css = preg_replace( '#@[a-z-]+[^{}]*\{(?:[^{}]*\{[^}]*\})*[^}]*\}#is', '', (string) $css );
+		if ( ! preg_match_all( '/([^{}]+)\{([^}]+)\}/s', (string) $css, $matches, PREG_SET_ORDER ) ) {
+			return $out;
+		}
+		foreach ( $matches as $m ) {
+			$selector     = trim( $m[1] );
+			$declarations = trim( $m[2] );
+			// Only keep selectors that mention at least one class.
+			if ( false === strpos( $selector, '.' ) ) {
+				continue;
+			}
+			$out[ $selector ] = $declarations;
+		}
+		return $out;
 	}
 
 	private function fetch_url( string $url ) {

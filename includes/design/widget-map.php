@@ -142,14 +142,33 @@ if ( ! function_exists( 'emcp_design_widget_map' ) ) {
 				'extractor'   => 'emcp_design_extractor_wrapped_image',
 			),
 
-			// 15. Interactive/opaque content → HTML fallback.
+			// 15. Horizontal rule → divider widget.
+			array(
+				'match'       => array( 'tag' => 'hr' ),
+				'widget_type' => 'divider',
+				'extractor'   => 'emcp_design_extractor_divider',
+			),
+
+			// 16. Empty <div> / <span> with an inline height/min-height → spacer widget.
+			//     Detects pure spacing elements like <div style="height:64px"></div>.
+			array(
+				'match'       => array(
+					'tag_in'              => array( 'div', 'span' ),
+					'class_pattern'       => '/\b(spacer|gap|gutter|space-[xy]?-?\d+)\b/',
+					'only_child_elements' => 0,
+				),
+				'widget_type' => 'spacer',
+				'extractor'   => 'emcp_design_extractor_spacer',
+			),
+
+			// 17. Interactive/opaque content → HTML fallback.
 			array(
 				'match'       => array( 'tag_in' => array( 'form', 'svg', 'script', 'iframe' ) ),
 				'widget_type' => 'html',
 				'extractor'   => 'emcp_design_extractor_outer_html',
 			),
 
-			// 16. Container — structural wrappers, children walked recursively.
+			// 18. Container — structural wrappers, children walked recursively.
 			array(
 				'match'       => array( 'tag_in' => array( 'section', 'div', 'aside', 'header', 'footer', 'main', 'article' ) ),
 				'widget_type' => 'container',
@@ -499,6 +518,66 @@ if ( ! function_exists( 'emcp_design_extractor_wrapped_image' ) ) {
 					'id'  => 0,
 					'alt' => $img ? $img->getAttribute( 'alt' ) : '',
 				),
+				'_css_classes' => $el->getAttribute( 'class' ),
+			),
+		);
+	}
+}
+
+if ( ! function_exists( 'emcp_design_extractor_divider' ) ) {
+	/**
+	 * <hr> → divider widget. Defaults to solid style; inline style override wins.
+	 */
+	function emcp_design_extractor_divider( \DOMElement $el ): array {
+		$settings = array(
+			'style'        => 'solid',
+			'weight'       => array( 'unit' => 'px', 'size' => 1, 'sizes' => array() ),
+			'_css_classes' => $el->getAttribute( 'class' ),
+		);
+		if ( function_exists( 'emcp_parse_inline_styles' ) ) {
+			$style = $el->getAttribute( 'style' );
+			if ( '' !== trim( $style ) ) {
+				$parsed = emcp_parse_inline_styles( $style );
+				// border-color / color map to divider color.
+				if ( isset( $parsed['border_color'] ) ) {
+					$settings['color'] = $parsed['border_color'];
+				}
+				if ( isset( $parsed['color'] ) ) {
+					$settings['color'] = $parsed['color'];
+				}
+			}
+		}
+		return array(
+			'widget_type' => 'divider',
+			'settings'    => $settings,
+		);
+	}
+}
+
+if ( ! function_exists( 'emcp_design_extractor_spacer' ) ) {
+	/**
+	 * Empty <div>/<span> with spacer-like class → spacer widget.
+	 * Height pulled from inline style `height` / `min-height` when present.
+	 */
+	function emcp_design_extractor_spacer( \DOMElement $el ): array {
+		$space = array( 'unit' => 'px', 'size' => 50, 'sizes' => array() );
+		if ( function_exists( 'emcp_parse_inline_styles' ) ) {
+			$style = $el->getAttribute( 'style' );
+			if ( '' !== trim( $style ) ) {
+				$props = emcp_style_parse_props( $style );
+				$val   = $props['height'] ?? $props['min-height'] ?? null;
+				if ( $val ) {
+					$parsed = emcp_style_parse_size( $val );
+					if ( $parsed ) {
+						$space = $parsed;
+					}
+				}
+			}
+		}
+		return array(
+			'widget_type' => 'spacer',
+			'settings'    => array(
+				'space'        => $space,
 				'_css_classes' => $el->getAttribute( 'class' ),
 			),
 		);

@@ -4,6 +4,35 @@ All notable changes to MCP Tools for Elementor are documented in this file.
 
 ## [Unreleased]
 
+### v1.5.1 — Quick Wins pre-Phase-C (2026-04-18)
+
+Five surgical fixes raising importer fidelity + feedback before the bigger Phase C work lands.
+
+- **QW1 — Conditional wrapper defaults.** Importer's outer wrapper no longer hardcodes `padding=0` + `flex_gap=0` when `<body>` carries an inline `style="…"`. Previously the parsed body-level spacing/background was clobbered by the reset. Now: no body style → reset (old behaviour, prevents theme bleed); body style present → merge parsed values, preserve `css_classes`. File: `class-design-importer.php`.
+
+- **QW2 — `!important` stripped in `emcp_style_parse_props`.** Real-world HTML ships `color:#fff !important;` — Elementor controls have their own specificity so we drop the bang-keyword before value mapping. File: `helpers/inline-style-parser.php`.
+
+- **QW3 — Two new widget-map rules + extractors**:
+  - `<hr>` → **divider** widget (`emcp_design_extractor_divider`). Pulls color from inline border-color/color.
+  - `<div class="spacer|gap|gutter">` or Tailwind-like `.space-y-4` with no element children → **spacer** widget (`emcp_design_extractor_spacer`). Height pulled from inline `height` / `min-height`.
+  - `widget-map.php` renumbered: old rules 15/16 → 17/18. New rule 15 = divider, rule 16 = spacer.
+
+- **QW4 — `<style>` class rules surfaced to `unmapped_elements`.** Previously `.hero__title{font-size:80px}` in an input stylesheet was dropped silently (only `:root` vars were captured via css-var-extractor). Now every class rule in a `<style>` block becomes an `unmapped_elements` entry with `reason: 'css_rule_unresolved'` + a hint to inline the style on the matching element. Naive regex tokenizer (`Elementor_MCP_Design_Importer::extract_class_rules`) skips `:root`, `@media`, `@supports`. Phase C replaces it with a real resolver.
+
+- **QW5 — Fidelity metrics in `import-design` response.** New fields:
+  - `widget_coverage_pct` (int 0-100) — `native_widgets ÷ (native + html_fallback)`.
+  - `fidelity_hint` (string) — `excellent|good|fair|poor` + actionable next step.
+  - Added to both `dry_run` and final return. Output schema + helper `Elementor_MCP_Design_Abilities::compute_import_metrics()` added.
+
+**Verification:**
+- `php tests/smoke-design-load.php` → 62/62 pass
+- Ad-hoc integration checks → 8/8 (!important strip, divider/spacer extraction, rule routing)
+- `php -l` syntax clean on all 4 edited files
+
+**Version bump:** `ELEMENTOR_MCP_VERSION` → `1.5.1`.
+
+---
+
 ### Inline Style Parser + dry_run mode (2026-04-18)
 
 Fixes the #1 fidelity gap in the HTML→Elementor importer: previously all `style="…"` attributes on imported containers were silently dropped, producing plain white boxes regardless of the design's intended colours, spacing, and layout.

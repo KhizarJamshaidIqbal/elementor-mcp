@@ -789,13 +789,16 @@ class Elementor_MCP_Design_Abilities {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'post_id'            => array( 'type' => 'integer' ),
-						'edit_url'           => array( 'type' => 'string' ),
-						'preview_url'        => array( 'type' => 'string' ),
-						'elements_created'   => array( 'type' => 'integer' ),
-						'native_widgets'     => array( 'type' => 'integer' ),
-						'html_fallbacks'     => array( 'type' => 'integer' ),
-						'tokens_extracted'   => array( 'type' => 'boolean' ),
+						'post_id'             => array( 'type' => 'integer' ),
+						'edit_url'            => array( 'type' => 'string' ),
+						'preview_url'         => array( 'type' => 'string' ),
+						'elements_created'    => array( 'type' => 'integer' ),
+						'native_widgets'      => array( 'type' => 'integer' ),
+						'html_fallbacks'      => array( 'type' => 'integer' ),
+						'tokens_extracted'    => array( 'type' => 'boolean' ),
+						'widget_coverage_pct' => array( 'type' => 'integer', 'description' => 'native_widgets ÷ (native+html) as 0-100 %.' ),
+						'fidelity_hint'       => array( 'type' => 'string', 'description' => 'Human-readable coverage grade: excellent/good/fair/poor + suggested action.' ),
+						'needs_review'        => array( 'type' => 'boolean', 'description' => 'True when unmapped_elements contains any no_rule_leaf entries.' ),
 					),
 				),
 				'meta'                => array(
@@ -868,20 +871,25 @@ class Elementor_MCP_Design_Abilities {
 		// Convert Design IR → Elementor JSON.
 		$elements = $this->realize_structure( $result['structure'] );
 
+		// QW5: precompute coverage metrics (same shape for dry-run and final return).
+		$stats_all    = $result['stats'] ?? array();
+		$unmapped_all = $result['unmapped_elements'] ?? array();
+		$metrics      = $this->compute_import_metrics( $stats_all, $unmapped_all );
+
 		// Dry-run: return stats without persisting anything.
 		if ( $dry_run ) {
-			$dry_stats    = $result['stats'] ?? array();
-			$dry_unmapped = $result['unmapped_elements'] ?? array();
 			return array(
 				'dry_run'              => true,
 				'elements_created'     => count( $elements ),
-				'elements_mapped'      => (int) ( $dry_stats['elements_mapped']      ?? 0 ),
-				'native_widgets'       => (int) ( $dry_stats['native_widgets']       ?? 0 ),
-				'html_fallbacks'       => (int) ( $dry_stats['html_widgets']         ?? 0 ),
-				'accordions_collapsed' => (int) ( $dry_stats['accordions_collapsed'] ?? 0 ),
+				'elements_mapped'      => (int) ( $stats_all['elements_mapped']      ?? 0 ),
+				'native_widgets'       => (int) ( $stats_all['native_widgets']       ?? 0 ),
+				'html_fallbacks'       => (int) ( $stats_all['html_widgets']         ?? 0 ),
+				'accordions_collapsed' => (int) ( $stats_all['accordions_collapsed'] ?? 0 ),
 				'tokens_extracted'     => is_array( $result['tokens']['raw'] ?? null ) ? count( $result['tokens']['raw'] ) : 0,
-				'unmapped_elements'    => $dry_unmapped,
-				'needs_review'         => count( array_filter( $dry_unmapped, fn( $u ) => 'no_rule_leaf' === $u['reason'] ) ) > 0,
+				'widget_coverage_pct'  => $metrics['widget_coverage_pct'],
+				'fidelity_hint'        => $metrics['fidelity_hint'],
+				'unmapped_elements'    => $unmapped_all,
+				'needs_review'         => $metrics['needs_review'],
 			);
 		}
 
@@ -911,27 +919,70 @@ class Elementor_MCP_Design_Abilities {
 
 		$this->flush_elementor_cache();
 
-		$stats = $result['stats'] ?? array();
-
-		$unmapped = $result['unmapped_elements'] ?? array();
-
 		return array(
 			'post_id'              => $page_id,
 			'edit_url'             => admin_url( 'post.php?post=' . $page_id . '&action=elementor' ),
 			'preview_url'          => (string) get_permalink( $page_id ),
 			'elements_created'     => count( $elements ),
-			'elements_mapped'      => (int) ( $stats['elements_mapped']      ?? 0 ),
-			'native_widgets'       => (int) ( $stats['native_widgets']       ?? 0 ),
-			'html_fallbacks'       => (int) ( $stats['html_widgets']         ?? 0 ),
-			'accordions_collapsed' => (int) ( $stats['accordions_collapsed'] ?? 0 ),
+			'elements_mapped'      => (int) ( $stats_all['elements_mapped']      ?? 0 ),
+			'native_widgets'       => (int) ( $stats_all['native_widgets']       ?? 0 ),
+			'html_fallbacks'       => (int) ( $stats_all['html_widgets']         ?? 0 ),
+			'accordions_collapsed' => (int) ( $stats_all['accordions_collapsed'] ?? 0 ),
 			'tokens_extracted'     => is_array( $result['tokens']['raw'] ?? null ) ? count( $result['tokens']['raw'] ) : 0,
 			'palette_bound_slots'  => count( $palette_globals ),
+			// QW5: coarse fidelity signal — helps Claude decide if re-annotation pass is worth it.
+			'widget_coverage_pct'  => $metrics['widget_coverage_pct'],
+			'fidelity_hint'        => $metrics['fidelity_hint'],
 			// Layer 3: Claude reads unmapped_elements to decide if re-annotation is needed.
 			// Each entry: {tag, class, id, snippet (≤300 chars), reason, hint}.
 			// reason = 'no_rule_leaf' → add data-emcp-widget attr and re-import.
 			// reason = 'forced_html_rule' → form/svg/iframe, expected — no action needed.
-			'unmapped_elements'    => $unmapped,
-			'needs_review'         => count( array_filter( $unmapped, fn( $u ) => 'no_rule_leaf' === $u['reason'] ) ) > 0,
+			// reason = 'css_rule_unresolved' → <style> class rule dropped, add inline style attr to element.
+			'unmapped_elements'    => $unmapped_all,
+			'needs_review'         => $metrics['needs_review'],
+		);
+	}
+
+	/**
+	 * Computes summary fidelity metrics from importer stats.
+	 *
+	 * Returns:
+	 *   - widget_coverage_pct (int 0-100): native_widgets ÷ (native + html fallback)
+	 *   - fidelity_hint       (string): human-readable grade Claude can quote back
+	 *   - needs_review        (bool): true when any 'no_rule_leaf' entries exist
+	 *
+	 * @param array $stats    Raw stats from Design_Importer::import().
+	 * @param array $unmapped Entries from importer's unmapped_elements list.
+	 * @return array{widget_coverage_pct:int,fidelity_hint:string,needs_review:bool}
+	 */
+	private function compute_import_metrics( array $stats, array $unmapped ): array {
+		$native    = (int) ( $stats['native_widgets'] ?? 0 );
+		$fallback  = (int) ( $stats['html_widgets']   ?? 0 );
+		$total     = $native + $fallback;
+		$coverage  = $total > 0 ? (int) round( ( $native / $total ) * 100 ) : 100;
+
+		$hint = 'excellent';
+		if ( $coverage < 95 ) {
+			$hint = 'good';
+		}
+		if ( $coverage < 80 ) {
+			$hint = 'fair — several elements fell to html widget; check unmapped_elements for fix suggestions';
+		}
+		if ( $coverage < 60 ) {
+			$hint = 'poor — add data-emcp-widget hints on unmapped elements or inline style attrs on class-styled elements, then re-import';
+		}
+
+		$needs_review = count( array_filter(
+			$unmapped,
+			static function ( $u ) {
+				return isset( $u['reason'] ) && 'no_rule_leaf' === $u['reason'];
+			}
+		) ) > 0;
+
+		return array(
+			'widget_coverage_pct' => $coverage,
+			'fidelity_hint'       => $hint,
+			'needs_review'        => $needs_review,
 		);
 	}
 }

@@ -862,7 +862,9 @@ body .emcp-faqpage .pop-card:hover .elementor-icon-box-icon .elementor-icon svg 
 }
 .emcp-faqpage .elementor-tab-title .elementor-accordion-icon {
   flex: 0 0 auto;
+  order: -1; /* push toggle to the LEFT of the title to match design */
   width: 34px; height: 34px;
+  margin-right: 4px;
   border-radius: 50%;
   background: var(--sand-100);
   border: 1px solid var(--line);
@@ -871,7 +873,10 @@ body .emcp-faqpage .pop-card:hover .elementor-icon-box-icon .elementor-icon svg 
   transition: background var(--d-base) var(--ease), border-color var(--d-base) var(--ease), transform var(--d-base) var(--ease);
 }
 .emcp-faqpage .elementor-tab-title .elementor-accordion-icon i,
-.emcp-faqpage .elementor-tab-title .elementor-accordion-icon svg { color: var(--midnight); font-size: 12px; width: 12px; height: 12px; }
+.emcp-faqpage .elementor-tab-title .elementor-accordion-icon svg {
+  color: var(--sunset) !important; fill: var(--sunset) !important;
+  font-size: 14px !important; width: 14px; height: 14px;
+}
 .emcp-faqpage .elementor-tab-title.elementor-active .elementor-accordion-icon {
   background: var(--g-sunset);
   border-color: transparent;

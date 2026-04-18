@@ -63,8 +63,10 @@ class Elementor_MCP_Article_Enhancer {
 		add_action( 'elementor/preview/enqueue_styles', array( $this, 'enqueue_styles_unconditional' ) );
 		add_action( 'elementor/editor/after_enqueue_styles', array( $this, 'enqueue_styles_unconditional' ) );
 
-		// FAQ page CSS — frontend enqueue (detects .emcp-faqpage wrapper).
-		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_faq_page_styles' ) );
+		// FAQ page CSS enqueue DISABLED (v1.7.4) — CSS now lives in each FAQ
+		// page's own `_elementor_page_settings.custom_css` field so pages survive
+		// plugin deletion. See emcp_pattern_faq_page_full pattern generator.
+		// add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_faq_page_styles' ) );
 	}
 
 	/**
@@ -80,42 +82,16 @@ class Elementor_MCP_Article_Enhancer {
 			array(),
 			ELEMENTOR_MCP_VERSION
 		);
-		wp_enqueue_style(
-			'emcp-faq-page',
-			ELEMENTOR_MCP_URL . 'includes/design/css/faq-page.css',
-			array(),
-			ELEMENTOR_MCP_VERSION
-		);
+		// faq-page.css enqueue removed (v1.7.4). FAQ styles now live in
+		// page's own `_elementor_page_settings.custom_css` — plugin-independent.
 	}
 
 	/**
-	 * Enqueues FAQ page CSS on the frontend when the current singular
-	 * page's `_elementor_data` postmeta contains the `emcp-faqpage`
-	 * wrapper class. Class-based detection survives slug changes
-	 * and works for any page rendered via the `faq.page-full` pattern.
+	 * Removed in v1.7.4 — FAQ page CSS now lives in each page's own
+	 * `_elementor_page_settings.custom_css`, so plugin deletion no longer
+	 * breaks FAQ-pattern pages. The emcp_pattern_faq_page_full generator
+	 * writes the CSS into the page settings during `design-page` build.
 	 */
-	public function enqueue_faq_page_styles(): void {
-		if ( is_admin() || ! is_singular() ) {
-			return;
-		}
-		$post_id = get_queried_object_id();
-		if ( ! $post_id ) {
-			return;
-		}
-		$data = get_post_meta( $post_id, '_elementor_data', true );
-		if ( ! is_string( $data ) || '' === $data ) {
-			return;
-		}
-		if ( false === strpos( $data, 'emcp-faqpage' ) ) {
-			return;
-		}
-		wp_enqueue_style(
-			'emcp-faq-page',
-			ELEMENTOR_MCP_URL . 'includes/design/css/faq-page.css',
-			array(),
-			ELEMENTOR_MCP_VERSION
-		);
-	}
 
 	/**
 	 * Wraps content + enriches markup when applicable.

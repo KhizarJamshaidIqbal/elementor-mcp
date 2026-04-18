@@ -89,12 +89,13 @@ if ( ! function_exists( 'emcp_faq_pf_hero' ) ) {
 
 		// Breadcrumb — native icon-list inline with design class .hero__crumbs.
 		if ( ! empty( $breadcrumb ) ) {
+			// Breadcrumb items — no icon set; CSS ::before adds "/" separator between items.
 			$bc_items = array();
 			foreach ( $breadcrumb as $i => $bc ) {
 				$bc_items[] = array(
 					'text'          => (string) ( $bc['label'] ?? '' ),
 					'link'          => array( 'url' => (string) ( $bc['url'] ?? '' ), 'is_external' => '', 'nofollow' => '' ),
-					'selected_icon' => $i === 0 ? array( 'value' => '', 'library' => '' ) : array( 'value' => 'fas fa-angle-right', 'library' => 'fa-solid' ),
+					'selected_icon' => array( 'value' => '', 'library' => '' ),
 					'_id'           => 'bc' . $i,
 				);
 			}
@@ -351,35 +352,84 @@ if ( ! function_exists( 'emcp_faq_pf_popular' ) ) {
 			'children' => $head_children,
 		);
 
-		// Cards — 6 native icon-box widgets with design .pop-card class.
+		// Cards — 6 native CONTAINERS (not icon-box) with 5 flat children each,
+		// matching design's <a class="pop-card"> flat DOM structure. Each child
+		// renders with its own design BEM class so faq-page.css drops in cleanly.
 		$card_children = array();
 		foreach ( $cards as $i => $card ) {
 			$icon = (string) ( $card['icon'] ?? 'fa-solid fa-circle' );
-			$lib  = strpos( $icon, 'fa-brands' ) === 0 || strpos( $icon, 'fab ' ) === 0 ? 'fa-brands'
-				: ( strpos( $icon, 'fa-regular' ) === 0 || strpos( $icon, 'far ' ) === 0 ? 'fa-regular' : 'fa-solid' );
 			$tag  = (string) ( $card['tag']  ?? '' );
 			$q    = (string) ( $card['question'] ?? '' );
 			$a    = (string) ( $card['answer']   ?? '' );
 			$link = (string) ( $card['link']     ?? '#' );
 
-			// description_text carries tag + answer + "Read more" — design classes preserved so CSS styles each span individually.
-			$desc_html = '<span class="pop-card__tag">' . esc_html( $tag ) . '</span>'
-				. '<span class="pop-card__a">' . esc_html( $a ) . '</span>'
-				. '<span class="pop-card__more">Read more <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span>';
+			$card_inner = array(
+				// 1. Icon chip — HTML widget (Elementor icon widget can't emit
+				//    named wrapper <div class="pop-card__icon">).
+				array(
+					'type'        => 'widget',
+					'widget_type' => 'html',
+					'settings'    => array(
+						'_title' => 'Icon',
+						'html'   => '<div class="pop-card__icon"><i class="' . esc_attr( $icon ) . '" aria-hidden="true"></i></div>',
+					),
+				),
+				// 2. Tag — heading widget (div header_size, BEM class).
+				array(
+					'type'        => 'widget',
+					'widget_type' => 'heading',
+					'settings'    => array(
+						'title'        => $tag,
+						'header_size'  => 'div',
+						'_title'       => 'Tag',
+						'_css_classes' => 'pop-card__tag',
+					),
+				),
+				// 3. Question — heading widget h3.
+				array(
+					'type'        => 'widget',
+					'widget_type' => 'heading',
+					'settings'    => array(
+						'title'        => $q,
+						'header_size'  => 'h3',
+						'_title'       => 'Question',
+						'_css_classes' => 'pop-card__q',
+					),
+				),
+				// 4. Answer — text-editor widget (wraps content in <p>).
+				array(
+					'type'        => 'widget',
+					'widget_type' => 'text-editor',
+					'settings'    => array(
+						'editor'       => '<p>' . esc_html( $a ) . '</p>',
+						'_title'       => 'Answer',
+						'_css_classes' => 'pop-card__a',
+					),
+				),
+				// 5. Read more — HTML widget (inline <span> + icon).
+				array(
+					'type'        => 'widget',
+					'widget_type' => 'html',
+					'settings'    => array(
+						'_title' => 'Read more',
+						'html'   => '<span class="pop-card__more">Read more <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span>',
+					),
+				),
+			);
 
 			$card_children[] = array(
-				'type'        => 'widget',
-				'widget_type' => 'icon-box',
-				'settings'    => array(
-					'selected_icon'    => array( 'value' => $icon, 'library' => $lib ),
-					'title_text'       => $q,
-					'description_text' => $desc_html,
+				'type'     => 'container',
+				'settings' => array(
+					'content_width'    => 'full',
+					'flex_direction'   => 'column',
+					'flex_align_items' => 'flex-start',
+					'flex_gap'         => array( 'unit' => 'px', 'size' => 14, 'column' => '14', 'row' => '14', 'isLinked' => true ),
+					'padding'          => array( 'unit' => 'px', 'top' => '28', 'right' => '26', 'bottom' => '24', 'left' => '26', 'isLinked' => false ),
 					'link'             => array( 'url' => $link, 'is_external' => '', 'nofollow' => '' ),
-					'title_size'       => 'h3',
-					'position'         => 'top',
 					'_title'           => 'Popular card ' . ( $i + 1 ),
-					'_css_classes'     => 'pop-card',
+					'css_classes'      => 'pop-card',
 				),
+				'children' => $card_inner,
 			);
 		}
 
@@ -498,7 +548,10 @@ if ( ! function_exists( 'emcp_faq_pf_library' ) ) {
 			$lbl = (string) ( $cat['heading'] ?? '' );
 			$cnt = (string) ( $cat['count']   ?? '' );
 			$aside_items[] = array(
-				'text'          => $lbl . ' · ' . $cnt,
+				// Label + right-aligned count span. CSS `.faq-aside a` uses
+				// `justify-content: space-between` so <span> pushes to the right
+				// and `.faq-aside a span` paints the count in muted ink-400.
+				'text'          => esc_html( $lbl ) . '<span>' . esc_html( $cnt ) . '</span>',
 				'link'          => array( 'url' => '#cat-' . $cid, 'is_external' => '', 'nofollow' => '' ),
 				'selected_icon' => array( 'value' => '', 'library' => '' ),
 				'_id'           => 'as' . $i,
@@ -551,18 +604,48 @@ if ( ! function_exists( 'emcp_faq_pf_library' ) ) {
 			$icon_lib  = strpos( $cat_icon, 'fa-regular' ) === 0 || strpos( $cat_icon, 'far ' ) === 0 ? 'fa-regular'
 				: ( strpos( $cat_icon, 'fa-brands' ) === 0 || strpos( $cat_icon, 'fab ' ) === 0 ? 'fa-brands' : 'fa-solid' );
 
-			// Category header — native icon-box with design .faq-cat__head class.
+			// Category header — flat CONTAINER matching design's <header class="faq-cat__head">
+			// with icon div + h3 title + span count as flat children.
 			$cat_header_widget = array(
-				'type'        => 'widget',
-				'widget_type' => 'icon-box',
-				'settings'    => array(
-					'selected_icon'    => array( 'value' => $cat_icon, 'library' => $icon_lib ),
-					'title_text'       => $cat_head,
-					'description_text' => $cat_count,
-					'title_size'       => 'h3',
-					'position'         => 'left',
+				'type'     => 'container',
+				'settings' => array(
+					'content_width'    => 'full',
+					'flex_direction'   => 'row',
+					'flex_align_items' => 'center',
+					'flex_gap'         => array( 'unit' => 'px', 'size' => 14, 'column' => '14', 'row' => '14', 'isLinked' => true ),
+					'padding'          => array( 'unit' => 'px', 'top' => '0', 'right' => '0', 'bottom' => '0', 'left' => '0', 'isLinked' => true ),
 					'_title'           => 'Cat header ' . $cat_id,
-					'_css_classes'     => 'faq-cat__head',
+					'css_classes'      => 'faq-cat__head',
+				),
+				'children' => array(
+					array(
+						'type'        => 'widget',
+						'widget_type' => 'html',
+						'settings'    => array(
+							'_title' => 'Cat icon',
+							'html'   => '<div class="faq-cat__icon"><i class="' . esc_attr( $cat_icon ) . '" aria-hidden="true"></i></div>',
+						),
+					),
+					array(
+						'type'        => 'widget',
+						'widget_type' => 'heading',
+						'settings'    => array(
+							'title'        => $cat_head,
+							'header_size'  => 'h3',
+							'_title'       => 'Cat title',
+							'_css_classes' => 'faq-cat__title',
+						),
+					),
+					array(
+						'type'        => 'widget',
+						'widget_type' => 'heading',
+						'settings'    => array(
+							'title'        => $cat_count,
+							'header_size'  => 'div',
+							'_title'       => 'Cat count',
+							'_css_classes' => 'faq-cat__count',
+						),
+					),
 				),
 			);
 
@@ -669,25 +752,74 @@ if ( ! function_exists( 'emcp_faq_pf_trust' ) ) {
 	function emcp_faq_pf_trust( array $items ): ?array {
 		if ( empty( $items ) ) { return null; }
 
+		// Badges — 4 native CONTAINERS (flat icon + text-column) matching
+		// design's <div class="trust-badge"> structure with .trust-badge__icon,
+		// .trust-badge__title, .trust-badge__sub as flat children.
 		$badge_children = array();
 		foreach ( $items as $i => $it ) {
 			$icon     = (string) ( $it['icon']  ?? 'fa-solid fa-check' );
 			$title    = (string) ( $it['title'] ?? '' );
 			$subtitle = (string) ( $it['subtitle'] ?? '' );
-			$lib      = strpos( $icon, 'fa-regular' ) === 0 || strpos( $icon, 'far ' ) === 0 ? 'fa-regular'
-				: ( strpos( $icon, 'fa-brands' ) === 0 || strpos( $icon, 'fab ' ) === 0 ? 'fa-brands' : 'fa-solid' );
-			$badge_children[] = array(
-				'type'        => 'widget',
-				'widget_type' => 'icon-box',
-				'settings'    => array(
-					'selected_icon'    => array( 'value' => $icon, 'library' => $lib ),
-					'title_text'       => $title,
-					'description_text' => $subtitle,
-					'title_size'       => 'div',
-					'position'         => 'left',
-					'_title'           => 'Trust ' . ( $i + 1 ),
-					'_css_classes'     => 'trust-badge',
+
+			$badge_inner = array(
+				// 1. Icon circle — HTML widget (named wrapper div).
+				array(
+					'type'        => 'widget',
+					'widget_type' => 'html',
+					'settings'    => array(
+						'_title' => 'Trust icon',
+						'html'   => '<div class="trust-badge__icon"><i class="' . esc_attr( $icon ) . '" aria-hidden="true"></i></div>',
+					),
 				),
+				// 2. Text column — container with title + subtitle headings.
+				array(
+					'type'     => 'container',
+					'settings' => array(
+						'content_width'    => 'full',
+						'flex_direction'   => 'column',
+						'flex_align_items' => 'flex-start',
+						'flex_gap'         => array( 'unit' => 'px', 'size' => 3, 'column' => '3', 'row' => '3', 'isLinked' => true ),
+						'padding'          => array( 'unit' => 'px', 'top' => '0', 'right' => '0', 'bottom' => '0', 'left' => '0', 'isLinked' => true ),
+						'_title'           => 'Trust text col',
+						'css_classes'      => 'trust-badge__text',
+					),
+					'children' => array(
+						array(
+							'type'        => 'widget',
+							'widget_type' => 'heading',
+							'settings'    => array(
+								'title'        => $title,
+								'header_size'  => 'div',
+								'_title'       => 'Trust title',
+								'_css_classes' => 'trust-badge__title',
+							),
+						),
+						array(
+							'type'        => 'widget',
+							'widget_type' => 'heading',
+							'settings'    => array(
+								'title'        => $subtitle,
+								'header_size'  => 'div',
+								'_title'       => 'Trust sub',
+								'_css_classes' => 'trust-badge__sub',
+							),
+						),
+					),
+				),
+			);
+
+			$badge_children[] = array(
+				'type'     => 'container',
+				'settings' => array(
+					'content_width'    => 'full',
+					'flex_direction'   => 'row',
+					'flex_align_items' => 'center',
+					'flex_gap'         => array( 'unit' => 'px', 'size' => 16, 'column' => '16', 'row' => '16', 'isLinked' => true ),
+					'padding'          => array( 'unit' => 'px', 'top' => '0', 'right' => '0', 'bottom' => '0', 'left' => '0', 'isLinked' => true ),
+					'_title'           => 'Trust badge ' . ( $i + 1 ),
+					'css_classes'      => 'trust-badge',
+				),
+				'children' => $badge_inner,
 			);
 		}
 

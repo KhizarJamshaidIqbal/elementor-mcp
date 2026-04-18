@@ -766,7 +766,21 @@ body .emcp-faqpage .pop-card:hover .elementor-icon-box-icon .elementor-icon svg 
   transition: background var(--d-fast) var(--ease), color var(--d-fast) var(--ease);
 }
 .emcp-faqpage .faq-aside a:hover { background: var(--sand-100); color: var(--midnight); }
-.emcp-faqpage .faq-aside a span { color: var(--ink-400); font-size: 12px; }
+/* Elementor wraps our "<label><span>count</span>" payload inside
+   .elementor-icon-list-text. Make THAT wrapper the flex container so
+   label stays left and count pushes right. */
+.emcp-faqpage .faq-aside a .elementor-icon-list-text {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+.emcp-faqpage .faq-aside a .elementor-icon-list-text > span {
+  color: var(--ink-400);
+  font-size: 12px;
+  font-weight: 400;
+}
 
 /* Category block */
 .emcp-faqpage .faq-cat {

@@ -107,21 +107,120 @@
 .emcp-faqpage a:hover { color: var(--sunset-700); }
 .emcp-faqpage img { max-width: 100%; display: block; }
 
-/* Eyebrow with gold dash prefix */
-.emcp-faqpage .eyebrow {
-  display: inline-flex; align-items: center; gap: 10px;
-  font-family: var(--f-body);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: .22em;
-  text-transform: uppercase;
-  color: var(--sunset);
+/* ── Eyebrow with gold dash prefix ─────────────────────────────
+   Class usually lands on Elementor heading-widget wrapper, so
+   we also target the inner .elementor-heading-title (which owns
+   the actual text + default font-size). ::before pseudo moves
+   to inner element so it sits inline-flex with the text. */
+.emcp-faqpage .eyebrow,
+.emcp-faqpage .eyebrow .elementor-heading-title,
+.emcp-faqpage span.eyebrow {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--f-body) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: .22em !important;
+  text-transform: uppercase !important;
+  color: var(--sunset) !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
 }
-.emcp-faqpage .eyebrow::before {
-  content: ""; width: 28px; height: 1px; background: var(--gold);
+.emcp-faqpage .eyebrow .elementor-heading-title::before,
+.emcp-faqpage span.eyebrow::before {
+  content: ""; width: 28px; height: 1px; background: var(--gold); flex: 0 0 auto;
 }
-.emcp-faqpage .eyebrow--on-dark { color: var(--gold-400); }
-.emcp-faqpage .eyebrow--on-dark::before { background: var(--gold); }
+/* When class on widget wrapper, the ::before on wrapper would sit outside the content flex — hide it there. */
+.emcp-faqpage .elementor-widget.eyebrow::before { display: none; }
+
+.emcp-faqpage .eyebrow--on-dark,
+.emcp-faqpage .eyebrow--on-dark .elementor-heading-title,
+.emcp-faqpage span.eyebrow--on-dark { color: var(--gold-400) !important; }
+.emcp-faqpage .eyebrow--on-dark .elementor-heading-title::before,
+.emcp-faqpage span.eyebrow--on-dark::before { background: var(--gold); }
+
+/* Higher-specificity eyebrow font-size override to beat Elementor's per-element
+   typography styles. (Elementor emits `.elementor-element.elementor-element-{id}
+   .elementor-heading-title { font-size: ... }` which has specificity (0,3,1);
+   match or exceed with (0,3,1)+. */
+body .emcp-faqpage .elementor-element.eyebrow .elementor-heading-title,
+body .emcp-faqpage .elementor-widget.eyebrow .elementor-heading-title {
+  font-size: 12px !important;
+  font-family: var(--f-body) !important;
+  font-weight: 600 !important;
+  letter-spacing: .22em !important;
+  text-transform: uppercase !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+}
+
+/* (Legacy flex-cell sizing for .pop-grid children removed — pattern now
+   emits container widgets directly so .pop-grid is display:grid with
+   grid-template-columns: repeat(3,1fr); cells size themselves. Forcing
+   max-width here caused cards to collapse to 260px inside a 361px cell,
+   with the difference appearing as a huge gap.) */
+/* (Prior rule stripping .e-con.e-child chrome was removed — after the
+   pattern switched from icon-box to container widgets, .pop-card IS the
+   .e-con.e-child; stripping its chrome broke the card visually.) */
+@media (max-width: 900px) {
+  .emcp-faqpage .pop-grid > .e-con,
+  .emcp-faqpage .pop-grid > .elementor-element {
+    flex: 1 1 calc(50% - 12px) !important;
+    max-width: calc(50% - 12px) !important;
+  }
+}
+@media (max-width: 560px) {
+  .emcp-faqpage .pop-grid > .e-con,
+  .emcp-faqpage .pop-grid > .elementor-element {
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* (Stripper rule for .trust-grid > .e-con.e-child removed — trust-badge
+   IS the e-con.e-child now that pattern emits container widgets.
+   Legacy flex max-width rules also removed — .trust-grid is grid with
+   grid-template-columns: repeat(4,1fr); cells size themselves.) */
+
+/* FAQ library layout: 240px sidebar + 1fr content. Children wrapped in
+   .e-con.e-child too — target wrappers. */
+.emcp-faqpage .faq-layout {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 64px !important;
+  align-items: flex-start;
+}
+.emcp-faqpage .faq-layout > .e-con:first-child,
+.emcp-faqpage .faq-layout > .elementor-element:first-child {
+  flex: 0 0 240px !important;
+  max-width: 240px !important;
+}
+.emcp-faqpage .faq-layout > .e-con:last-child,
+.emcp-faqpage .faq-layout > .elementor-element:last-child {
+  flex: 1 1 auto !important;
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  .emcp-faqpage .faq-layout { flex-direction: column !important; }
+  .emcp-faqpage .faq-layout > .e-con:first-child,
+  .emcp-faqpage .faq-layout > .elementor-element:first-child { display: none !important; }
+}
+
+/* Popular section title + description — match design's LEFT-aligned layout
+   (image shows current renders title centered, description centered). Design
+   has .popular-head__text max-width 640px, all children left-aligned. */
+.emcp-faqpage .popular-head,
+.emcp-faqpage .popular-head .elementor-widget { align-self: flex-start !important; }
+.emcp-faqpage .popular-head .elementor-widget-heading .elementor-heading-title,
+.emcp-faqpage .popular-head .elementor-widget-text-editor p { text-align: left !important; }
+
+/* Trust-badge layout — title + subtitle should stack vertically next to icon,
+   icon sits left. Elementor icon-box layout position:'left' already handles it,
+   but some themes force title block to full width. Constrain content. */
+.emcp-faqpage .trust-badge .elementor-icon-box-content {
+  flex: 1 1 auto;
+}
 
 /* ============================================================
    1 · HERO
@@ -161,6 +260,27 @@
 .emcp-faqpage .hero__crumbs a,
 .emcp-faqpage .hero__crumbs .elementor-icon-list-item a { color: rgba(255,255,255,.85); font-weight: 500; }
 .emcp-faqpage .hero__crumbs a:hover { color: var(--gold-400); }
+
+/* Icon-list renders items inline — inject "/" separator between items (not before first) */
+.emcp-faqpage .hero__crumbs .elementor-icon-list-items { display: flex !important; flex-wrap: wrap; gap: 0 !important; }
+.emcp-faqpage .hero__crumbs .elementor-icon-list-item + .elementor-icon-list-item::before {
+  content: "/";
+  color: rgba(255,255,255,.5);
+  margin: 0 10px;
+  font-weight: 400;
+}
+/* Last crumb (current page) — gold color */
+.emcp-faqpage .hero__crumbs .elementor-icon-list-item:last-child a,
+.emcp-faqpage .hero__crumbs .elementor-icon-list-item:last-child { color: var(--gold-400); }
+
+/* Elementor wraps HTML widget in .elementor-widget-container which may constrain
+   child width. Force the search form's parent wrappers to 100% so the form's
+   max-width: 620px is actually reachable. */
+.emcp-faqpage .elementor-widget-html:has(.hero__search),
+.emcp-faqpage .elementor-widget-html:has(.hero__search) > .elementor-widget-container {
+  width: 100% !important;
+  max-width: 620px !important;
+}
 
 .emcp-faqpage .hero__title,
 .emcp-faqpage .hero__title .elementor-heading-title {
@@ -246,10 +366,24 @@
   border-color: rgba(255,255,255,.4); color: #fff !important;
 }
 
-/* Decorative dune silhouette */
+/* Decorative dune silhouette — SVG lives inside an Elementor .elementor-widget-html
+   which normally participates in flex flow. Pull the entire widget wrapper out to
+   hero's bottom edge so the wave touches the section's bottom and covers the dark-to-
+   light transition. */
+.emcp-faqpage .hero .elementor-widget-html:has(.hero__dunes),
+.emcp-faqpage .hero .elementor-widget-html:has(.hero__dunes) > .elementor-widget-container {
+  position: absolute !important;
+  left: 0; right: 0; bottom: -1px;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none;
+  z-index: 2;
+}
 .emcp-faqpage .hero__dunes {
-  position: absolute; left: 0; right: 0; bottom: -1px;
-  width: 100%; height: 60px; z-index: 1;
+  display: block;
+  width: 100%; height: 60px;
   pointer-events: none; color: var(--sand-50);
 }
 
@@ -316,7 +450,43 @@
   margin-bottom: var(--sp-7);
 }
 .emcp-faqpage .popular-head h2,
-.emcp-faqpage .popular-head .elementor-heading-title { font-size: var(--fs-h2) !important; }
+.emcp-faqpage .popular-head .elementor-heading-title {
+  font-size: var(--fs-h2) !important;
+  font-family: var(--f-display) !important;
+  color: var(--midnight) !important;
+  font-weight: 700 !important;
+  font-style: normal !important;
+  letter-spacing: -.01em !important;
+  line-height: 1.15 !important;
+}
+/* <em> inside popular-head h2 — normal style + dune gradient text. */
+.emcp-faqpage .popular-head h2 em,
+.emcp-faqpage .popular-head .elementor-heading-title em {
+  font-style: normal !important;
+  background: var(--g-dune) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Library intro head — same treatment */
+.emcp-faqpage .section__title,
+.emcp-faqpage .section__title .elementor-heading-title {
+  font-family: var(--f-display) !important;
+  color: var(--midnight) !important;
+  font-weight: 700 !important;
+  font-style: normal !important;
+}
+.emcp-faqpage .section__title em,
+.emcp-faqpage .section__title .elementor-heading-title em {
+  font-style: normal !important;
+  background: var(--g-dune) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+}
 .emcp-faqpage .popular-head p { color: var(--ink-500); font-size: var(--fs-lede); line-height: 1.6; }
 
 .emcp-faqpage .pop-grid {
@@ -383,14 +553,138 @@
   letter-spacing: .14em; text-transform: uppercase;
   color: var(--ink-400); display: block; margin-bottom: 6px;
 }
-.emcp-faqpage .pop-card .elementor-icon-box-title,
-.emcp-faqpage .pop-card__q {
+body .emcp-faqpage .pop-card .elementor-icon-box-title,
+body .emcp-faqpage .pop-card .elementor-icon-box-title > *,
+body .emcp-faqpage .pop-card__q {
   font-family: var(--f-display) !important;
   font-size: var(--fs-h3) !important;
   font-weight: 600 !important;
   color: var(--midnight) !important;
-  line-height: 1.25;
+  line-height: 1.25 !important;
+  margin: 0 !important;
+  text-transform: none !important;
+  letter-spacing: -.01em !important;
 }
+
+/* Icon tile — force sunset color + sand bg regardless of Elementor kit defaults */
+body .emcp-faqpage .pop-card .elementor-icon-box-icon .elementor-icon,
+body .emcp-faqpage .pop-card .elementor-icon-box-icon .elementor-icon i,
+body .emcp-faqpage .pop-card .elementor-icon-box-icon .elementor-icon svg {
+  color: var(--sunset) !important;
+  fill: var(--sunset) !important;
+}
+body .emcp-faqpage .pop-card .elementor-icon-box-icon .elementor-icon {
+  background: var(--sand-50) !important;
+  border: 1px solid var(--sand-200);
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 14px !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  font-size: 22px !important;
+  margin: 0 !important;
+}
+body .emcp-faqpage .pop-card:hover .elementor-icon-box-icon .elementor-icon,
+body .emcp-faqpage .pop-card:hover .elementor-icon-box-icon .elementor-icon i,
+body .emcp-faqpage .pop-card:hover .elementor-icon-box-icon .elementor-icon svg {
+  color: #fff !important;
+  fill: #fff !important;
+  background: var(--g-sunset) !important;
+  border-color: transparent !important;
+}
+
+/* Card layout — tag now lives inside title_text as a sibling <span>, so
+   natural order is: icon → (tag + question inside title) → (answer + more
+   inside description). Left-align everything. */
+.emcp-faqpage .pop-card .elementor-icon-box-wrapper {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 14px !important;
+  text-align: left !important;
+}
+.emcp-faqpage .pop-card .elementor-icon-box-content {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 10px;
+  width: 100%;
+}
+
+/* title container (h3) should not bold/affect the tag span; reset h3 internal styling */
+.emcp-faqpage .pop-card .elementor-icon-box-title {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 8px;
+  font-size: inherit !important;
+  font-weight: normal !important;
+  letter-spacing: normal !important;
+  line-height: 1 !important;
+  margin: 0 !important;
+}
+.emcp-faqpage .pop-card .elementor-icon-box-title > * { display: block; }
+
+/* Tag span (inside title) — small gray uppercase. */
+.emcp-faqpage .pop-card .pop-card__tag {
+  display: block;
+  font-family: var(--f-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  text-align: left;
+  line-height: 1.2;
+}
+
+/* Question span (inside title) — serif h3. */
+.emcp-faqpage .pop-card .pop-card__q {
+  display: block;
+  font-family: var(--f-display);
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  color: var(--midnight);
+  line-height: 1.25;
+  letter-spacing: -.01em;
+  text-align: left;
+}
+
+/* Answer + Read more — inside description paragraph. */
+.emcp-faqpage .pop-card .elementor-icon-box-description {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 12px;
+  width: 100%;
+  margin: 0 !important;
+}
+.emcp-faqpage .pop-card .pop-card__a {
+  display: block;
+  font-family: var(--f-body);
+  font-size: 14.5px;
+  color: var(--ink-500);
+  line-height: 1.65;
+  text-align: left;
+}
+.emcp-faqpage .pop-card .pop-card__more {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  color: var(--sunset) !important;
+  font-family: var(--f-body);
+  font-size: 14px;
+  font-weight: 600;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(26,26,46,.08);
+  width: 100%;
+}
+.emcp-faqpage .pop-card .pop-card__more i {
+  transition: transform var(--d-base) var(--ease);
+  font-size: 11px;
+}
+.emcp-faqpage .pop-card:hover .pop-card__more i { transform: translateX(4px); }
 .emcp-faqpage .pop-card__a {
   font-size: 14.5px; color: var(--ink-500); line-height: 1.65;
   display: -webkit-box;
@@ -430,6 +724,15 @@
   grid-template-columns: 240px 1fr !important;
   gap: var(--sp-8); align-items: start;
 }
+/* Elementor defaults .e-con.e-child to width:50% inside flex parents. When
+   .faq-layout is overridden to grid, the 50% computes against each grid track,
+   halving both children. Force children to fill their grid track. */
+.emcp-faqpage .faq-layout > .e-con.e-child,
+.emcp-faqpage .faq-layout > .elementor-element {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 1 auto !important;
+}
 
 .emcp-faqpage .faq-aside {
   position: sticky; top: 130px;
@@ -439,10 +742,14 @@
   border-radius: var(--r-lg);
   backdrop-filter: blur(8px);
 }
-.emcp-faqpage .faq-aside__label {
-  font-size: 11px; font-weight: 700;
-  letter-spacing: .18em; text-transform: uppercase;
-  color: var(--sunset); margin-bottom: var(--sp-4);
+/* Label — target both widget wrapper AND inner heading-title so Elementor's
+   default .elementor-heading-title font-size cannot win. Gotcha 13 applies. */
+.emcp-faqpage .faq-aside__label,
+.emcp-faqpage .faq-aside__label .elementor-heading-title {
+  font-size: 11px !important; font-weight: 700 !important;
+  letter-spacing: .18em !important; text-transform: uppercase !important;
+  color: var(--sunset) !important; margin-bottom: var(--sp-4) !important;
+  line-height: 1.4 !important;
 }
 .emcp-faqpage .faq-aside ul,
 .emcp-faqpage .faq-aside .elementor-icon-list-items {
@@ -746,4 +1053,224 @@
   .emcp-faqpage .tabs__btn { padding: 18px 14px 16px; font-size: 14px; }
   .emcp-faqpage .tabs__btn::after { left: 14px; right: 14px; }
   .emcp-faqpage .trust-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FLAT-MARKUP overrides (post v1.5.0 pattern refactor)
+   Pop-card / trust-badge / faq-cat__head emit as Elementor containers
+   with native child widgets instead of icon-box. Each child wraps in
+   .elementor-widget-{type}. Target inner elements via `.parent .child`
+   descendant selector — wrappers don't need direct-child specificity.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Pop-card container — Elementor sets inline padding/margin custom props
+   via per-element CSS; override with !important on every visual property.
+   Also force width:100% to undo Elementor's --width:16.67% (calculated
+   from 6 flex siblings) so each card fills its grid cell. */
+body .emcp-faqpage .pop-card {
+  width: 100% !important;
+  background: var(--surface) !important;
+  border-radius: var(--r-lg) !important;
+  padding: 28px 26px 24px !important;
+  box-shadow: var(--sh-sm) !important;
+  border: 1px solid var(--line) !important;
+  transition: transform var(--d-base) var(--ease),
+              box-shadow var(--d-base) var(--ease),
+              border-color var(--d-base) var(--ease) !important;
+  text-decoration: none !important;
+  color: inherit;
+  overflow: hidden;
+  isolation: isolate;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+}
+body .emcp-faqpage .pop-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--sh-lg);
+  border-color: rgba(233,104,12,.25);
+}
+
+/* Pop-card direct children — strip Elementor widget wrapper chrome */
+body .emcp-faqpage .pop-card > .elementor-widget,
+body .emcp-faqpage .pop-card > .elementor-element {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+}
+body .emcp-faqpage .pop-card > .elementor-widget > .elementor-widget-container {
+  padding: 0 !important;
+}
+
+/* Icon chip (HTML widget) */
+body .emcp-faqpage .pop-card .pop-card__icon {
+  width: 56px; height: 56px;
+  border-radius: 14px;
+  background: var(--sand-50);
+  border: 1px solid var(--sand-200);
+  color: var(--sunset);
+  display: grid; place-items: center;
+  font-size: 22px;
+  transition: background var(--d-base) var(--ease), color var(--d-base) var(--ease), border-color var(--d-base) var(--ease), box-shadow var(--d-base) var(--ease);
+}
+body .emcp-faqpage .pop-card:hover .pop-card__icon {
+  background: var(--g-sunset);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: var(--sh-sunset);
+}
+body .emcp-faqpage .pop-card .pop-card__icon i { color: inherit; }
+
+/* Tag (heading widget, div header_size) */
+body .emcp-faqpage .pop-card .pop-card__tag .elementor-heading-title {
+  font-family: var(--f-body) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: .14em !important;
+  text-transform: uppercase !important;
+  color: var(--ink-400) !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+}
+
+/* Question (heading widget, h3) */
+body .emcp-faqpage .pop-card .pop-card__q .elementor-heading-title {
+  font-family: var(--f-display) !important;
+  font-size: var(--fs-h3) !important;
+  font-weight: 600 !important;
+  color: var(--midnight) !important;
+  line-height: 1.25 !important;
+  letter-spacing: -.01em !important;
+  margin: 0 !important;
+}
+
+/* Answer (text-editor widget) */
+body .emcp-faqpage .pop-card .pop-card__a p,
+body .emcp-faqpage .pop-card .pop-card__a {
+  font-family: var(--f-body) !important;
+  font-size: 14.5px !important;
+  color: var(--ink-500) !important;
+  line-height: 1.65 !important;
+  margin: 0 !important;
+}
+
+/* Read more (HTML widget with span + icon) — design has NO border-top on
+   this element, just plain inline text with sunset color. */
+body .emcp-faqpage .pop-card .pop-card__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sunset);
+  font-family: var(--f-body);
+  font-size: 14px;
+  font-weight: 600;
+  padding-top: 10px;
+  margin-top: auto;
+  border-top: 0 !important;
+}
+body .emcp-faqpage .pop-card .pop-card__more i {
+  transition: transform var(--d-base) var(--ease);
+  font-size: 11px;
+}
+body .emcp-faqpage .pop-card:hover .pop-card__more i { transform: translateX(4px); }
+
+/* ── Trust-badge flat structure ─────────────────────────────────── */
+body .emcp-faqpage .trust-badge {
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 16px !important;
+  padding: 0 !important;
+}
+body .emcp-faqpage .trust-badge > .elementor-widget,
+body .emcp-faqpage .trust-badge > .elementor-element {
+  margin: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+}
+body .emcp-faqpage .trust-badge > .elementor-widget > .elementor-widget-container {
+  padding: 0 !important;
+}
+
+body .emcp-faqpage .trust-badge .trust-badge__icon {
+  width: 52px; height: 52px;
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg, rgba(212,168,83,.15), rgba(233,104,12,.15));
+  border: 1px solid rgba(212,168,83,.3);
+  display: grid; place-items: center;
+  color: var(--gold-400);
+  font-size: 20px;
+  flex: 0 0 auto;
+}
+body .emcp-faqpage .trust-badge__text { flex: 1 1 auto; }
+body .emcp-faqpage .trust-badge .trust-badge__title .elementor-heading-title {
+  font-family: var(--f-display) !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: #fff !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+}
+body .emcp-faqpage .trust-badge .trust-badge__sub .elementor-heading-title {
+  font-size: 13px !important;
+  color: rgba(255,255,255,.62) !important;
+  line-height: 1.4 !important;
+  letter-spacing: .02em !important;
+  font-weight: normal !important;
+  margin: 0 !important;
+  font-family: var(--f-body) !important;
+}
+
+/* ── faq-cat__head flat structure ───────────────────────────────── */
+body .emcp-faqpage .faq-cat__head {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 14px !important;
+  padding: 0 0 16px !important;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px !important;
+}
+body .emcp-faqpage .faq-cat__head > .elementor-widget,
+body .emcp-faqpage .faq-cat__head > .elementor-element {
+  margin: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+}
+body .emcp-faqpage .faq-cat__head > .elementor-widget > .elementor-widget-container {
+  padding: 0 !important;
+}
+
+body .emcp-faqpage .faq-cat__head .faq-cat__icon {
+  width: 40px; height: 40px;
+  border-radius: var(--r-md);
+  background: rgba(255,255,255,.85);
+  border: 1px solid var(--line);
+  display: grid; place-items: center;
+  color: var(--sunset);
+  font-size: 16px;
+  flex: 0 0 auto;
+}
+body .emcp-faqpage .faq-cat__head .faq-cat__title .elementor-heading-title {
+  font-family: var(--f-display) !important;
+  font-size: clamp(22px, 2.2vw, 28px) !important;
+  font-weight: 700 !important;
+  color: var(--midnight) !important;
+  letter-spacing: -.01em !important;
+  line-height: 1.15 !important;
+  margin: 0 !important;
+  flex: 1;
+}
+body .emcp-faqpage .faq-cat__head .faq-cat__title {
+  flex: 1 1 auto;
+}
+body .emcp-faqpage .faq-cat__head .faq-cat__count .elementor-heading-title {
+  font-family: var(--f-body) !important;
+  font-size: 12px !important;
+  color: var(--ink-400) !important;
+  font-weight: 500 !important;
+  margin: 0 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
 }

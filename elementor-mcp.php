@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'ELEMENTOR_MCP_VERSION', '1.4.3' );
+define( 'ELEMENTOR_MCP_VERSION', '1.5.0' );
 define( 'ELEMENTOR_MCP_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ELEMENTOR_MCP_URL', plugin_dir_url( __FILE__ ) );
 define( 'ELEMENTOR_MCP_BASENAME', plugin_basename( __FILE__ ) );
@@ -182,6 +182,28 @@ function elementor_mcp_init(): void {
 	require_once ELEMENTOR_MCP_DIR . 'includes/abilities/class-stock-image-abilities.php';
 	require_once ELEMENTOR_MCP_DIR . 'includes/abilities/class-svg-icon-abilities.php';
 	require_once ELEMENTOR_MCP_DIR . 'includes/abilities/class-custom-code-abilities.php';
+
+	// Design pipeline (v1.5.0+) — additive, non-breaking.
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/helpers/array-merge.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/helpers/responsive.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/tokens/palettes.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/tokens/typography.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/tokens/spacing.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/tokens/effects.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/tokens/buttons.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/class-token-resolver.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/class-kit-binder.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/class-pattern-registry.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/class-design-compiler.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/class-article-enhancer.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/tokens/css-var-extractor.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/widget-map.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/class-design-importer.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/abilities/class-design-abilities.php';
+
+	// Boot article enhancer (blog content formatting + callouts + dropcap).
+	Elementor_MCP_Article_Enhancer::instance()->register_hooks();
+
 	require_once ELEMENTOR_MCP_DIR . 'includes/abilities/class-ability-registrar.php';
 	require_once ELEMENTOR_MCP_DIR . 'includes/class-plugin.php';
 

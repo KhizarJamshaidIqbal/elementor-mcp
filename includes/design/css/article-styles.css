@@ -1,0 +1,1645 @@
+/**
+ * Elementor MCP — Blog Article Styles (scoped).
+ *
+ * Applied only within `.emcp-article`. Reads palette via CSS custom
+ * properties emitted inline by PHP (based on bound kit palette).
+ * No global leakage.
+ */
+
+.emcp-article {
+	--emcp-primary:   #D2691E;
+	--emcp-secondary: #8B4513;
+	--emcp-accent:    #F4A460;
+	--emcp-text:      #1F1A17;
+	--emcp-muted:     #5C4B40;
+	--emcp-surface:   #FFF8F1;
+	--emcp-surf-alt:  #F5E6D3;
+	--emcp-border:    #E8D5C0;
+
+	color: var( --emcp-text );
+	line-height: 1.7;
+	font-size: 18px;
+	max-width: 100%;
+}
+
+/* Headings */
+
+.emcp-article h2,
+.emcp-article h3,
+.emcp-article h4 {
+	color: var( --emcp-text );
+	line-height: 1.25;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	position: relative;
+}
+
+.emcp-article h2 {
+	font-size: clamp( 28px, 3.2vw, 40px );
+	margin: 2.2em 0 0.6em;
+	padding-bottom: 0.4em;
+	border-bottom: 1px solid var( --emcp-border );
+}
+
+.emcp-article h2::before {
+	content: '';
+	position: absolute;
+	left: 0;
+	bottom: -1px;
+	width: 60px;
+	height: 3px;
+	background: var( --emcp-accent );
+	border-radius: 2px;
+}
+
+.emcp-article h3 {
+	font-size: clamp( 22px, 2.4vw, 28px );
+	margin: 1.8em 0 0.5em;
+}
+
+.emcp-article h4 {
+	margin: 1.5em 0 0.4em;
+	color: var( --emcp-muted );
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	font-size: 14px;
+}
+
+.emcp-article h2 a.emcp-anchor,
+.emcp-article h3 a.emcp-anchor {
+	color: var( --emcp-border );
+	text-decoration: none;
+	margin-left: 0.4em;
+	opacity: 0;
+	transition: opacity 150ms ease;
+	font-weight: 400;
+}
+.emcp-article h2:hover a.emcp-anchor,
+.emcp-article h3:hover a.emcp-anchor { opacity: 1; }
+
+/* Paragraphs, lead, dropcap */
+
+.emcp-article p { margin: 0 0 1.1em; }
+
+.emcp-article p[data-first='true'] {
+	font-size: 1.15em;
+	color: var( --emcp-text );
+}
+
+.emcp-article p[data-first='true']::first-letter {
+	float: left;
+	font-size: 4.2em;
+	line-height: 0.9;
+	padding: 6px 12px 0 0;
+	font-weight: 700;
+	color: var( --emcp-primary );
+	font-family: inherit;
+}
+
+/* Links */
+
+.emcp-article a:not(.emcp-anchor):not(.emcp-btn) {
+	color: var( --emcp-primary );
+	text-decoration: underline;
+	text-decoration-thickness: 1px;
+	text-underline-offset: 3px;
+	transition: color 150ms;
+}
+.emcp-article a:not(.emcp-anchor):not(.emcp-btn):hover {
+	color: var( --emcp-secondary );
+}
+
+/* Lists */
+
+.emcp-article ul,
+.emcp-article ol {
+	margin: 0 0 1.2em 1.4em;
+	padding: 0;
+}
+
+.emcp-article li {
+	margin-bottom: 0.5em;
+	padding-left: 0.2em;
+}
+
+.emcp-article ul li::marker {
+	color: var( --emcp-accent );
+}
+
+.emcp-article ul.emcp-checklist {
+	list-style: none;
+	margin-left: 0;
+}
+.emcp-article ul.emcp-checklist li {
+	padding-left: 2em;
+	position: relative;
+}
+.emcp-article ul.emcp-checklist li::before {
+	content: '✓';
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 1.4em;
+	height: 1.4em;
+	background: var( --emcp-accent );
+	color: #fff;
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 700;
+	font-size: 0.8em;
+}
+
+.emcp-article ol.emcp-steps {
+	list-style: none;
+	counter-reset: emcp-step;
+	margin-left: 0;
+}
+.emcp-article ol.emcp-steps li {
+	counter-increment: emcp-step;
+	padding-left: 2.6em;
+	position: relative;
+	margin-bottom: 1em;
+}
+.emcp-article ol.emcp-steps li::before {
+	content: counter( emcp-step );
+	position: absolute;
+	left: 0;
+	top: -2px;
+	width: 2em;
+	height: 2em;
+	background: var( --emcp-primary );
+	color: #fff;
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 700;
+	font-size: 0.9em;
+}
+
+/* Blockquote + pull-quote */
+
+.emcp-article blockquote {
+	margin: 1.6em 0;
+	padding: 1.2em 1.4em 1.2em 1.6em;
+	border-left: 4px solid var( --emcp-accent );
+	background: var( --emcp-surf-alt );
+	border-radius: 0 8px 8px 0;
+	font-size: 1.1em;
+	font-style: italic;
+	color: var( --emcp-muted );
+}
+
+.emcp-article blockquote p:last-child { margin-bottom: 0; }
+
+.emcp-article blockquote cite {
+	display: block;
+	margin-top: 0.6em;
+	font-style: normal;
+	font-size: 0.9em;
+	color: var( --emcp-text );
+	font-weight: 600;
+}
+
+.emcp-article .emcp-pull-quote {
+	margin: 2em 0;
+	padding: 1.6em;
+	font-size: 1.4em;
+	line-height: 1.35;
+	font-weight: 700;
+	text-align: center;
+	color: var( --emcp-primary );
+	border-top: 3px solid var( --emcp-accent );
+	border-bottom: 3px solid var( --emcp-accent );
+	font-style: italic;
+}
+
+/* Tables (v2 upgraded) */
+
+.emcp-article table {
+	width: 100%;
+	margin: 2em 0;
+	border-collapse: separate;
+	border-spacing: 0;
+	border-radius: 16px;
+	overflow: hidden;
+	box-shadow: 0 4px 20px rgba( 0, 0, 0, 0.06 ), 0 0 0 1px var( --emcp-border );
+	background: #fff;
+	font-size: 0.95em;
+}
+
+.emcp-article table thead {
+	background: linear-gradient( 135deg, var( --emcp-primary ), var( --emcp-secondary ) );
+}
+
+.emcp-article table th {
+	color: #fff;
+	text-align: left;
+	padding: 16px 20px;
+	font-weight: 700;
+	font-size: 0.85em;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	border: 0;
+	position: relative;
+}
+
+.emcp-article table th + th {
+	border-left: 1px solid rgba( 255, 255, 255, 0.15 );
+}
+
+.emcp-article table td {
+	padding: 16px 20px;
+	border-top: 1px solid var( --emcp-border );
+	font-size: 0.95em;
+	vertical-align: top;
+	transition: background 150ms;
+}
+
+.emcp-article table td:first-child {
+	font-weight: 600;
+	color: var( --emcp-text );
+}
+
+.emcp-article table td:last-child {
+	font-weight: 700;
+	color: var( --emcp-primary );
+	white-space: nowrap;
+}
+
+.emcp-article table tbody tr:nth-child( even ) td {
+	background: var( --emcp-surface );
+}
+
+.emcp-article table tbody tr:hover td {
+	background: linear-gradient( 90deg, color-mix( in srgb, var( --emcp-accent ) 18%, transparent ), color-mix( in srgb, var( --emcp-accent ) 8%, transparent ) );
+}
+
+.emcp-article table tbody tr:first-child td {
+	border-top: 0;
+}
+
+/* Optional row counter */
+.emcp-article table.emcp-numbered tbody { counter-reset: emcp-row; }
+.emcp-article table.emcp-numbered tbody tr td:first-child::before {
+	counter-increment: emcp-row;
+	content: counter( emcp-row, decimal-leading-zero ) '  ';
+	color: var( --emcp-accent );
+	font-weight: 700;
+	font-size: 0.85em;
+}
+
+@media ( max-width: 600px ) {
+	.emcp-article table,
+	.emcp-article thead,
+	.emcp-article tbody,
+	.emcp-article tr,
+	.emcp-article th,
+	.emcp-article td {
+		display: block;
+	}
+	.emcp-article thead { display: none; }
+	.emcp-article tbody tr {
+		margin-bottom: 1em;
+		border: 1px solid var( --emcp-border );
+		border-radius: 8px;
+		overflow: hidden;
+	}
+	.emcp-article tbody td {
+		border-top: none;
+		border-bottom: 1px solid var( --emcp-border );
+		padding: 10px 14px;
+	}
+	.emcp-article tbody td:last-child { border-bottom: none; }
+	.emcp-article tbody td::before {
+		content: attr( data-label );
+		font-weight: 700;
+		color: var( --emcp-primary );
+		display: block;
+		font-size: 0.75em;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 4px;
+	}
+}
+
+/* Images, figures */
+
+.emcp-article img {
+	max-width: 100%;
+	height: auto;
+	border-radius: 12px;
+	box-shadow: 0 6px 18px rgba( 0, 0, 0, 0.08 );
+	margin: 1.4em 0;
+}
+
+.emcp-article figure { margin: 1.6em 0; }
+.emcp-article figure img { margin: 0; }
+
+.emcp-article figcaption {
+	margin-top: 0.6em;
+	font-size: 0.9em;
+	color: var( --emcp-muted );
+	text-align: center;
+	font-style: italic;
+}
+
+/* Code */
+
+.emcp-article code {
+	background: var( --emcp-surf-alt );
+	color: var( --emcp-secondary );
+	padding: 0.15em 0.45em;
+	border-radius: 4px;
+	font-size: 0.9em;
+	font-family: 'JetBrains Mono', 'Consolas', monospace;
+}
+
+.emcp-article pre {
+	background: #1F1A17;
+	color: #F5E6D3;
+	padding: 1.2em 1.4em;
+	border-radius: 10px;
+	overflow-x: auto;
+	margin: 1.4em 0;
+	font-size: 0.9em;
+	line-height: 1.55;
+}
+
+.emcp-article pre code {
+	background: transparent;
+	color: inherit;
+	padding: 0;
+	font-size: inherit;
+}
+
+/* Horizontal rule */
+
+.emcp-article hr {
+	border: 0;
+	margin: 2.2em auto;
+	text-align: center;
+	height: 6px;
+	position: relative;
+}
+.emcp-article hr::after {
+	content: '· · ·';
+	color: var( --emcp-accent );
+	font-size: 1.4em;
+	letter-spacing: 0.5em;
+	font-weight: 700;
+}
+
+/* Callouts */
+
+.emcp-callout {
+	margin: 1.6em 0;
+	padding: 1em 1.2em 1em 3em;
+	border-radius: 10px;
+	position: relative;
+	line-height: 1.6;
+	font-size: 0.98em;
+}
+
+.emcp-callout::before {
+	position: absolute;
+	left: 1em;
+	top: 1em;
+	width: 1.5em;
+	height: 1.5em;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	font-weight: 700;
+	font-size: 0.9em;
+}
+
+.emcp-callout p:last-child { margin-bottom: 0; }
+
+.emcp-callout-info {
+	background: #EAF4FB;
+	color: #1E3A5F;
+	border-left: 4px solid #2980B9;
+}
+.emcp-callout-info::before { content: 'i'; background: #2980B9; color: #fff; font-style: italic; }
+
+.emcp-callout-warn {
+	background: #FFF6E5;
+	color: #6B4A00;
+	border-left: 4px solid #E6A817;
+}
+.emcp-callout-warn::before { content: '!'; background: #E6A817; color: #fff; }
+
+.emcp-callout-success {
+	background: #E9F7EF;
+	color: #1E5F3A;
+	border-left: 4px solid #27AE60;
+}
+.emcp-callout-success::before { content: '✓'; background: #27AE60; color: #fff; }
+
+.emcp-callout-tip {
+	background: var( --emcp-surf-alt );
+	color: var( --emcp-text );
+	border-left: 4px solid var( --emcp-accent );
+}
+.emcp-callout-tip::before { content: '★'; background: var( --emcp-accent ); color: #fff; }
+
+.emcp-callout strong:first-of-type {
+	display: block;
+	margin-bottom: 0.3em;
+	font-weight: 700;
+}
+
+/* Inline stat chip */
+
+.emcp-stat {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.4em;
+	padding: 0.25em 0.7em;
+	background: var( --emcp-surface );
+	border: 1px solid var( --emcp-border );
+	border-radius: 999px;
+	font-size: 0.95em;
+	margin: 0 0.2em;
+}
+.emcp-stat-value {
+	font-weight: 700;
+	color: var( --emcp-primary );
+}
+.emcp-stat-label {
+	color: var( --emcp-muted );
+	font-size: 0.85em;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+/* Keyboard key */
+
+.emcp-article kbd {
+	display: inline-block;
+	padding: 2px 6px;
+	background: #fff;
+	border: 1px solid var( --emcp-border );
+	border-bottom-width: 2px;
+	border-radius: 4px;
+	font-family: 'JetBrains Mono', 'Consolas', monospace;
+	font-size: 0.85em;
+	color: var( --emcp-text );
+}
+
+/* Strong + em */
+
+.emcp-article strong { color: var( --emcp-text ); font-weight: 700; }
+.emcp-article em     { color: var( --emcp-muted ); }
+
+/* Print */
+
+@media print {
+	.emcp-article { font-size: 11pt; line-height: 1.5; }
+	.emcp-article h2::before,
+	.emcp-callout::before { display: none; }
+	.emcp-article pre, .emcp-callout { box-shadow: none; }
+}
+
+/* ═════════════════════════════════════════════════════
+   v2 ENHANCEMENTS (2026-04-17)
+   Reading progress, auto-TOC, section badges, scroll
+   reveal, keyword marks, better image treatments,
+   nested-dropcap fix for Elementor wrappers.
+   ═════════════════════════════════════════════════════ */
+
+/* Reading progress bar */
+.emcp-reading-progress {
+	position: fixed;
+	top: 0;
+	left: 0;
+	height: 3px;
+	width: 0%;
+	background: linear-gradient( 90deg, var( --emcp-primary, #D2691E ), var( --emcp-accent, #F4A460 ) );
+	z-index: 9999;
+	transition: width 80ms linear;
+	box-shadow: 0 1px 4px rgba( 0, 0, 0, 0.1 );
+}
+
+/* Meta strip (read time + updated) */
+.emcp-article-meta {
+	display: flex;
+	align-items: center;
+	gap: 18px;
+	padding: 14px 0;
+	margin: 0 0 24px;
+	border-top: 1px solid var( --emcp-border );
+	border-bottom: 1px solid var( --emcp-border );
+	font-size: 13px;
+	color: var( --emcp-muted );
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	font-weight: 600;
+}
+.emcp-article-meta svg,
+.emcp-article-meta .emcp-meta-icon {
+	width: 16px;
+	height: 16px;
+	flex-shrink: 0;
+	color: var( --emcp-accent );
+}
+.emcp-article-meta .emcp-meta-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+.emcp-article-meta .emcp-meta-sep {
+	width: 3px;
+	height: 3px;
+	background: var( --emcp-border );
+	border-radius: 50%;
+}
+
+/* Auto-TOC */
+.emcp-toc {
+	margin: 28px 0;
+	padding: 20px 22px;
+	background: linear-gradient( 135deg, var( --emcp-surf-alt ), transparent );
+	border: 1px solid var( --emcp-border );
+	border-radius: 14px;
+	position: relative;
+	overflow: hidden;
+}
+.emcp-toc::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 4px;
+	height: 100%;
+	background: var( --emcp-accent );
+}
+.emcp-toc-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 12px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.12em;
+	color: var( --emcp-primary );
+	margin: 0 0 12px;
+}
+.emcp-toc-title::before {
+	content: '☰';
+	font-size: 16px;
+}
+.emcp-toc ol {
+	list-style: none;
+	counter-reset: emcp-toc-step;
+	margin: 0;
+	padding: 0;
+	columns: 2;
+	column-gap: 28px;
+}
+.emcp-toc li {
+	counter-increment: emcp-toc-step;
+	margin: 0 0 6px;
+	padding: 0;
+	break-inside: avoid;
+	font-size: 14px;
+	line-height: 1.45;
+}
+.emcp-toc li a {
+	color: var( --emcp-text );
+	text-decoration: none;
+	display: inline-flex;
+	align-items: baseline;
+	gap: 8px;
+	padding: 4px 0;
+	transition: color 150ms;
+}
+.emcp-toc li a::before {
+	content: counter( emcp-toc-step, decimal-leading-zero );
+	color: var( --emcp-accent );
+	font-weight: 700;
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+}
+.emcp-toc li a {
+	padding: 6px 10px 6px 12px;
+	border-radius: 8px;
+	position: relative;
+	transition: background 180ms ease, color 180ms ease, padding-left 180ms ease, box-shadow 180ms ease;
+	width: 100%;
+}
+
+.emcp-toc li a::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	top: 6px;
+	bottom: 6px;
+	width: 3px;
+	border-radius: 3px;
+	background: var( --emcp-accent );
+	opacity: 0;
+	transform: scaleY( 0.4 );
+	transition: opacity 180ms, transform 180ms;
+}
+
+.emcp-toc li a:hover {
+	background: color-mix( in srgb, var( --emcp-accent ) 22%, transparent );
+	color: var( --emcp-primary );
+	padding-left: 18px;
+	box-shadow: 0 2px 8px rgba( 0, 0, 0, 0.06 );
+}
+
+.emcp-toc li a:hover::after {
+	opacity: 1;
+	transform: scaleY( 1 );
+}
+
+/* Scroll-spy active TOC item (added by enhancer JS) */
+.emcp-toc li a.emcp-active {
+	background: color-mix( in srgb, var( --emcp-primary ) 14%, transparent );
+	color: var( --emcp-primary );
+	font-weight: 600;
+	padding-left: 18px;
+}
+.emcp-toc li a.emcp-active::after {
+	opacity: 1;
+	transform: scaleY( 1 );
+	background: var( --emcp-primary );
+}
+.emcp-toc li a.emcp-active::before {
+	content: counter( emcp-toc-step, decimal-leading-zero );
+	color: var( --emcp-primary );
+}
+
+/* H2 flash when linked to via TOC hover or active */
+.emcp-article h2.emcp-hovered {
+	background: color-mix( in srgb, var( --emcp-accent ) 16%, transparent );
+	transition: background 240ms ease;
+	border-radius: 8px;
+	padding-left: 16px !important;
+	margin-left: -16px;
+}
+@media ( max-width: 700px ) {
+	.emcp-toc ol { columns: 1; }
+}
+
+/* H2 auto-numbering */
+.emcp-article {
+	counter-reset: emcp-section;
+}
+.emcp-article h2 {
+	counter-increment: emcp-section;
+	padding-top: 8px;
+}
+.emcp-article h2::after {
+	content: counter( emcp-section, decimal-leading-zero );
+	position: absolute;
+	top: -8px;
+	right: 0;
+	font-size: 14px;
+	font-weight: 700;
+	color: var( --emcp-accent );
+	letter-spacing: 0.1em;
+	opacity: 0.85;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Dropcap — reach past Elementor wrappers */
+.emcp-article .elementor-widget-text-editor:first-of-type
+	.elementor-widget-container > p:first-child,
+.emcp-article .elementor-widget-theme-post-content
+	.elementor-widget-container p[data-first='true'],
+.emcp-article .elementor-widget-theme-post-content
+	.elementor-widget-container > div > p:first-child {
+	font-size: 1.12em;
+	color: var( --emcp-text );
+}
+.emcp-article .elementor-widget-text-editor:first-of-type
+	.elementor-widget-container > p:first-child::first-letter,
+.emcp-article .elementor-widget-theme-post-content
+	.elementor-widget-container p[data-first='true']::first-letter,
+.emcp-article .elementor-widget-theme-post-content
+	.elementor-widget-container > div > p:first-child::first-letter {
+	float: left;
+	font-size: 4.2em;
+	line-height: 0.86;
+	padding: 6px 14px 4px 0;
+	font-weight: 700;
+	color: var( --emcp-primary );
+	font-family: inherit;
+}
+
+/* Keyword mark */
+.emcp-article mark,
+.emcp-mark {
+	background: linear-gradient( 180deg, transparent 60%, var( --emcp-accent ) 60% );
+	color: var( --emcp-text );
+	padding: 0 2px;
+	font-weight: 600;
+}
+
+/* Tag chip */
+.emcp-tag {
+	display: inline-block;
+	padding: 3px 10px;
+	margin: 2px 4px 2px 0;
+	background: var( --emcp-surf-alt );
+	color: var( --emcp-secondary );
+	font-size: 12px;
+	font-weight: 600;
+	border-radius: 999px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	border: 1px solid var( --emcp-border );
+}
+
+/* Breadcrumb */
+.emcp-breadcrumb {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	font-size: 13px;
+	color: var( --emcp-muted );
+	margin: 0 0 18px;
+	padding: 0;
+	list-style: none;
+}
+.emcp-breadcrumb li { display: inline-flex; align-items: center; gap: 6px; }
+.emcp-breadcrumb li:not(:last-child)::after {
+	content: '›';
+	margin-left: 6px;
+	color: var( --emcp-border );
+	font-weight: 700;
+}
+.emcp-breadcrumb a {
+	color: var( --emcp-primary );
+	text-decoration: none;
+}
+.emcp-breadcrumb a:hover { text-decoration: underline; }
+.emcp-breadcrumb li:last-child {
+	color: var( --emcp-text );
+	font-weight: 600;
+}
+
+/* Scroll reveal */
+@media ( prefers-reduced-motion: no-preference ) {
+	.emcp-article h2,
+	.emcp-article figure,
+	.emcp-article blockquote,
+	.emcp-callout,
+	.emcp-article table,
+	.emcp-pull-quote {
+		opacity: 0;
+		transform: translateY( 18px );
+		animation: emcp-reveal 500ms ease-out forwards;
+		animation-timeline: view();
+		animation-range: entry 0% cover 30%;
+	}
+}
+@keyframes emcp-reveal {
+	to { opacity: 1; transform: translateY( 0 ); }
+}
+
+/* Image hover elevate */
+.emcp-article figure:hover img,
+.emcp-article .elementor-widget-text-editor img:hover {
+	transform: translateY( -2px );
+	box-shadow: 0 10px 28px rgba( 0, 0, 0, 0.14 );
+	transition: transform 300ms ease, box-shadow 300ms ease;
+}
+
+/* Fallback dropcap — plain content */
+.emcp-article > p[data-first='true']::first-letter,
+.emcp-article > .elementor-widget:first-child p[data-first='true']::first-letter {
+	float: left;
+	font-size: 4.2em;
+	line-height: 0.86;
+	padding: 6px 14px 4px 0;
+	font-weight: 700;
+	color: var( --emcp-primary );
+}
+
+/* Decorative blockquote mark */
+.emcp-article blockquote {
+	position: relative;
+}
+.emcp-article blockquote::before {
+	content: '"';
+	position: absolute;
+	top: -12px;
+	left: 14px;
+	font-size: 60px;
+	font-family: Georgia, serif;
+	color: var( --emcp-accent );
+	opacity: 0.6;
+	font-weight: 700;
+	line-height: 1;
+}
+
+/* Anchor-link hover highlight */
+.emcp-article a[href^='#']:not(.emcp-anchor):hover {
+	background: linear-gradient( 180deg, transparent 80%, var( --emcp-accent ) 80% );
+}
+
+/* Mobile tighten */
+@media ( max-width: 600px ) {
+	.emcp-article { font-size: 17px; }
+	.emcp-article h2::after { display: none; }
+	.emcp-toc { padding: 16px 18px; }
+}
+
+/* ═════════════════════════════════════════════════════
+   Author card (content.author-bio pattern)
+   ═════════════════════════════════════════════════════ */
+
+.emcp-author-card {
+	transition: transform 260ms ease, box-shadow 260ms ease;
+	position: relative;
+	overflow: hidden;
+}
+.emcp-author-card::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 4px;
+	background: linear-gradient( 90deg, var( --emcp-primary, #D2691E ), var( --emcp-accent, #F4A460 ) );
+}
+.emcp-author-card:hover {
+	transform: translateY( -3px );
+	box-shadow: 0 14px 36px rgba( 0, 0, 0, 0.10 );
+}
+
+/* Site logo — circular with accent ring. Author-bio section lives
+   OUTSIDE .emcp-article wrapper (it's a sibling section in the theme
+   template, not the-content filter output). No .emcp-article prefix. */
+.emcp-author-avatar img,
+.elementor-widget-image.emcp-author-avatar img,
+.elementor-widget.emcp-author-avatar img {
+	border-radius: 999px !important;
+	width: 96px !important;
+	height: 96px !important;
+	object-fit: cover;
+	padding: 5px !important;
+	background: var( --emcp-surface, #FFF8F1 ) !important;
+	box-shadow: 0 0 0 2px var( --emcp-accent, #F4A460 ),
+	            0 0 0 7px color-mix( in srgb, var( --emcp-accent, #F4A460 ) 25%, transparent ) !important;
+}
+
+/* Eyebrow styling — small brand label above name */
+.emcp-author-eyebrow {
+	font-size: 11px !important;
+	letter-spacing: 0.14em !important;
+	font-weight: 700 !important;
+	opacity: 0.92;
+	margin-bottom: 4px !important;
+}
+
+/* Author name — tighter heading */
+.emcp-author-name {
+	margin: 2px 0 8px !important;
+	line-height: 1.2 !important;
+}
+
+/* Author description — italic flow */
+.emcp-author-desc p {
+	margin: 0 0 8px;
+	font-style: italic;
+	line-height: 1.55;
+}
+.emcp-author-desc:empty,
+.emcp-author-desc p:empty {
+	display: none;
+}
+
+/* Tagline — small subtle separator below */
+.emcp-author-tagline {
+	margin-top: 8px !important;
+	padding-top: 10px !important;
+	border-top: 1px dashed var( --emcp-border );
+	font-size: 12px !important;
+	opacity: 0.8;
+}
+
+/* Social icons row inside author card.
+   Idle state = brand-authentic color filled; hover = elevate + deepen shadow. */
+.emcp-author-socials {
+	margin-top: 10px !important;
+}
+.emcp-author-socials .elementor-social-icon,
+.elementor-widget.emcp-author-socials .elementor-social-icon {
+	color: #FFFFFF !important;
+	border: 0 !important;
+	width: 36px;
+	height: 36px;
+	line-height: 36px;
+	transition: transform 220ms ease, box-shadow 220ms ease, filter 220ms ease;
+}
+
+/* Idle brand colors per platform.
+   NOTE: `.elementor-social-icon` IS the <a> element (not a child). Use
+   platform-specific classes like `.elementor-social-icon-instagram`
+   which Elementor attaches to the same anchor. Split background-color
+   from background-image so gradient platforms don't get clobbered by
+   the widget's solid-color rule. */
+body .emcp-author-socials .elementor-social-icon-instagram,
+html .elementor-widget.emcp-author-socials .elementor-social-icon-instagram {
+	background-color: transparent !important;
+	background-image: linear-gradient( 135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100% ) !important;
+	color: #FFFFFF !important;
+	box-shadow: 0 3px 8px rgba( 220, 39, 67, 0.28 );
+}
+body .emcp-author-socials .elementor-social-icon-facebook-f,
+body .emcp-author-socials .elementor-social-icon-facebook,
+html .elementor-widget.emcp-author-socials .elementor-social-icon-facebook-f,
+html .elementor-widget.emcp-author-socials .elementor-social-icon-facebook {
+	background-color: #1877F2 !important;
+	background-image: none !important;
+	color: #FFFFFF !important;
+	box-shadow: 0 3px 8px rgba( 24, 119, 242, 0.28 );
+}
+body .emcp-author-socials .elementor-social-icon-x-twitter,
+body .emcp-author-socials .elementor-social-icon-twitter,
+html .elementor-widget.emcp-author-socials .elementor-social-icon-x-twitter,
+html .elementor-widget.emcp-author-socials .elementor-social-icon-twitter {
+	background-color: #000000 !important;
+	background-image: none !important;
+	color: #FFFFFF !important;
+	box-shadow: 0 3px 8px rgba( 0, 0, 0, 0.28 );
+}
+body .emcp-author-socials .elementor-social-icon-youtube,
+html .elementor-widget.emcp-author-socials .elementor-social-icon-youtube {
+	background-color: #FF0000 !important;
+	background-image: none !important;
+	color: #FFFFFF !important;
+	box-shadow: 0 3px 8px rgba( 255, 0, 0, 0.28 );
+}
+body .emcp-author-socials .elementor-social-icon-tiktok,
+html .elementor-widget.emcp-author-socials .elementor-social-icon-tiktok {
+	background-color: transparent !important;
+	background-image: linear-gradient( 135deg, #25F4EE 0%, #000000 50%, #FE2C55 100% ) !important;
+	color: #FFFFFF !important;
+	box-shadow: 0 3px 8px rgba( 254, 44, 85, 0.32 );
+}
+body .emcp-author-socials .elementor-social-icon-pinterest-p,
+body .emcp-author-socials .elementor-social-icon-pinterest,
+html .elementor-widget.emcp-author-socials .elementor-social-icon-pinterest-p,
+html .elementor-widget.emcp-author-socials .elementor-social-icon-pinterest {
+	background-color: #E60023 !important;
+	background-image: none !important;
+	color: #FFFFFF !important;
+	box-shadow: 0 3px 8px rgba( 230, 0, 35, 0.28 );
+}
+
+/* Hover = lift + deeper shadow + slight brightness */
+.emcp-author-socials .elementor-social-icon:hover,
+.elementor-widget.emcp-author-socials .elementor-social-icon:hover {
+	transform: translateY( -3px ) scale( 1.06 );
+	filter: brightness( 1.08 );
+}
+body .emcp-author-socials .elementor-social-icon-instagram:hover   { box-shadow: 0 10px 22px rgba( 220, 39, 67, 0.45 ) !important; }
+body .emcp-author-socials .elementor-social-icon-facebook-f:hover,
+body .emcp-author-socials .elementor-social-icon-facebook:hover    { box-shadow: 0 10px 22px rgba( 24, 119, 242, 0.45 ) !important; }
+body .emcp-author-socials .elementor-social-icon-x-twitter:hover,
+body .emcp-author-socials .elementor-social-icon-twitter:hover     { box-shadow: 0 10px 22px rgba( 0, 0, 0, 0.45 ) !important; }
+body .emcp-author-socials .elementor-social-icon-youtube:hover     { box-shadow: 0 10px 22px rgba( 255, 0, 0, 0.45 ) !important; }
+body .emcp-author-socials .elementor-social-icon-tiktok:hover      { box-shadow: 0 10px 22px rgba( 254, 44, 85, 0.50 ) !important; }
+body .emcp-author-socials .elementor-social-icon-pinterest-p:hover,
+body .emcp-author-socials .elementor-social-icon-pinterest:hover   { box-shadow: 0 10px 22px rgba( 230, 0, 35, 0.45 ) !important; }
+
+/* ═════════════════════════════════════════════════════
+   Related posts grid — "You may also like"
+   Pattern: content.related-posts
+   Target: .emcp-related-section with Elementor Pro posts widget classic skin
+   ═════════════════════════════════════════════════════ */
+
+body .emcp-related-section { padding-top: 80px !important; padding-bottom: 80px !important; }
+
+/* Eyebrow spacing */
+.emcp-related-eyebrow { margin-bottom: -8px !important; font-weight: 700 !important; }
+.emcp-related-heading { margin-bottom: 24px !important; }
+
+/* Hide default Elementor divider between meta + excerpt */
+body .emcp-related-grid .elementor-post__meta-data + .elementor-post__excerpt { margin-top: 10px; }
+
+/* Card wrapper — each .elementor-post becomes a card */
+body .emcp-related-grid .elementor-post,
+body .elementor-widget.emcp-related-grid .elementor-post {
+	background: #FFFFFF;
+	border-radius: 16px;
+	overflow: hidden;
+	box-shadow: 0 2px 10px rgba( 0, 0, 0, 0.05 );
+	transition: transform 320ms cubic-bezier( 0.2, 0.8, 0.2, 1 ), box-shadow 320ms ease;
+	display: flex;
+	flex-direction: column;
+	border: 1px solid rgba( 0, 0, 0, 0.04 );
+}
+body .emcp-related-grid .elementor-post:hover,
+body .elementor-widget.emcp-related-grid .elementor-post:hover {
+	transform: translateY( -6px );
+	box-shadow: 0 18px 40px rgba( 0, 0, 0, 0.12 );
+}
+
+/* Image — wrapper crops full-cover, image zooms on hover.
+   Force aspect-ratio container so image always fills + zooms correctly
+   regardless of native dimensions. */
+body .emcp-related-grid .elementor-post__thumbnail__link {
+	overflow: hidden !important;
+	display: block !important;
+	position: relative !important;
+	width: 100% !important;
+	aspect-ratio: 16 / 10 !important;
+	background: var( --emcp-surf-alt, #F5E6D3 );
+}
+body .emcp-related-grid .elementor-post__thumbnail {
+	overflow: hidden !important;
+	border-radius: 0 !important;
+	width: 100% !important;
+	height: 100% !important;
+	padding: 0 !important;
+	margin: 0 !important;
+	position: absolute !important;
+	top: 0 !important;
+	left: 0 !important;
+}
+body .emcp-related-grid .elementor-post__thumbnail img {
+	width: 100% !important;
+	height: 100% !important;
+	object-fit: cover !important;
+	object-position: center !important;
+	display: block !important;
+	transition: transform 600ms cubic-bezier( 0.2, 0.8, 0.2, 1 ) !important;
+	will-change: transform;
+	max-width: none !important;
+}
+body .emcp-related-grid .elementor-post:hover .elementor-post__thumbnail img {
+	transform: scale( 1.06 ) !important;
+}
+
+/* Overlay gradient on image hover (subtle darken) */
+body .emcp-related-grid .elementor-post__thumbnail__link::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient( 180deg, transparent 55%, rgba( 0, 0, 0, 0.35 ) 100% );
+	opacity: 0;
+	transition: opacity 320ms ease;
+	pointer-events: none;
+}
+body .emcp-related-grid .elementor-post:hover .elementor-post__thumbnail__link::after {
+	opacity: 1;
+}
+
+/* Text area */
+body .emcp-related-grid .elementor-post__text {
+	padding: 22px 22px 24px !important;
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+}
+
+/* Title — brand text color, not bright orange. Hover → primary.
+   MAX specificity with tag + class combo to beat Elementor's widget
+   typography defaults. */
+html body .emcp-related-grid h3.elementor-post__title,
+html body .emcp-related-grid .elementor-post__title,
+html body .elementor-widget.emcp-related-grid h3.elementor-post__title {
+	margin: 0 0 10px !important;
+	line-height: 1.3 !important;
+	font-size: 19px !important;
+	font-weight: 700 !important;
+	font-family: inherit !important;
+	letter-spacing: -0.005em !important;
+}
+html body .emcp-related-grid h3.elementor-post__title,
+html body .emcp-related-grid .elementor-post__title,
+html body .emcp-related-grid h3.elementor-post__title a,
+html body .emcp-related-grid .elementor-post__title a,
+html body .elementor-widget.emcp-related-grid h3.elementor-post__title,
+html body .elementor-widget.emcp-related-grid h3.elementor-post__title a {
+	color: var( --emcp-text, #1F1A17 ) !important;
+	text-decoration: none !important;
+	transition: color 220ms ease;
+	background-image: none !important;
+	font-size: 19px !important;
+	line-height: 1.3 !important;
+}
+html body .emcp-related-grid h3.elementor-post__title a:hover,
+html body .emcp-related-grid .elementor-post__title a:hover,
+html body .emcp-related-grid .elementor-post:hover h3.elementor-post__title,
+html body .emcp-related-grid .elementor-post:hover .elementor-post__title,
+html body .emcp-related-grid .elementor-post:hover .elementor-post__title a {
+	color: var( --emcp-primary, #D2691E ) !important;
+}
+
+/* Hide Elementor's weirdly-named "comments" meta (class is .elementor-post-avatar) */
+html body .emcp-related-grid .elementor-post-avatar {
+	display: none !important;
+}
+
+/* Meta — small, uppercase, muted, with dot separator */
+body .emcp-related-grid .elementor-post__meta-data {
+	font-size: 11px !important;
+	letter-spacing: 0.1em !important;
+	text-transform: uppercase !important;
+	color: var( --emcp-muted, #5C4B40 ) !important;
+	margin: 0 0 10px !important;
+	font-weight: 600 !important;
+	opacity: 0.85;
+}
+body .emcp-related-grid .elementor-post-date::before {
+	content: '📅 ';
+	margin-right: 2px;
+	filter: grayscale( 1 ) opacity( 0.6 );
+}
+
+/* Excerpt — comfortable body text */
+body .emcp-related-grid .elementor-post__excerpt {
+	margin: 0 0 14px !important;
+}
+body .emcp-related-grid .elementor-post__excerpt p {
+	font-size: 14px !important;
+	line-height: 1.6 !important;
+	color: var( --emcp-muted, #5C4B40 ) !important;
+	margin: 0 !important;
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+/* Read-more arrow CTA */
+body .emcp-related-grid .elementor-post__read-more {
+	margin-top: auto !important;
+	padding: 0 !important;
+	font-size: 13px !important;
+	font-weight: 700 !important;
+	letter-spacing: 0.02em !important;
+	color: var( --emcp-primary, #D2691E ) !important;
+	text-decoration: none !important;
+	background: none !important;
+	border: 0 !important;
+	align-self: flex-start;
+	position: relative;
+	transition: color 200ms ease, transform 200ms ease;
+	display: inline-block;
+	padding-top: 8px !important;
+	border-top: 1px dashed var( --emcp-border, #E8D5C0 ) !important;
+	width: auto !important;
+}
+body .emcp-related-grid .elementor-post__read-more:hover {
+	color: var( --emcp-secondary, #8B4513 ) !important;
+	transform: translateX( 3px );
+}
+
+/* Mobile: tighter padding */
+@media ( max-width: 700px ) {
+	body .emcp-related-section { padding-top: 48px !important; padding-bottom: 48px !important; }
+	body .emcp-related-grid .elementor-post__text { padding: 18px !important; }
+	body .emcp-related-grid .elementor-post__title { font-size: 17px !important; }
+}
+
+/* ═════════════════════════════════════════════════════
+   CTA banner (cta.banner-full-width pattern)
+   ═════════════════════════════════════════════════════ */
+
+body .emcp-cta-banner {
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
+}
+
+/* Multi-layer atmospheric overlay — stronger base + radial accent glow + vignette */
+body .emcp-cta-banner::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background:
+		radial-gradient( 60% 80% at 50% 40%, rgba( 210, 105, 30, 0.18 ) 0%, transparent 60% ),
+		radial-gradient( 120% 100% at 50% 100%, rgba( 0, 0, 0, 0.55 ) 0%, transparent 60% );
+	pointer-events: none;
+	z-index: 0;
+}
+
+/* Animated shimmer sweep — subtle, once-per-interaction feel */
+body .emcp-cta-banner::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient( 110deg, transparent 0%, rgba( 255, 255, 255, 0.04 ) 45%, rgba( 255, 255, 255, 0.09 ) 50%, rgba( 255, 255, 255, 0.04 ) 55%, transparent 100% );
+	background-size: 300% 100%;
+	animation: emcpCtaShimmer 12s ease-in-out infinite;
+	pointer-events: none;
+	z-index: 0;
+	mix-blend-mode: overlay;
+}
+@keyframes emcpCtaShimmer {
+	0%, 100% { background-position: -150% 0; }
+	50%      { background-position: 150% 0; }
+}
+
+body .emcp-cta-inner {
+	position: relative;
+	z-index: 2;
+	max-width: min( 820px, 92vw );
+}
+
+/* Eyebrow pill — glass with accent glow */
+.emcp-cta-eyebrow-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	background: rgba( 255, 255, 255, 0.12 );
+	color: #FFFFFF;
+	padding: 8px 18px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.18em;
+	line-height: 1.2;
+	backdrop-filter: blur( 10px );
+	-webkit-backdrop-filter: blur( 10px );
+	border: 1px solid rgba( 255, 255, 255, 0.22 );
+	box-shadow: 0 0 0 4px rgba( var( --accent-rgb, 244, 164, 96 ), 0.0 ), 0 8px 24px rgba( 0, 0, 0, 0.18 );
+	position: relative;
+	transition: transform 320ms ease, box-shadow 320ms ease;
+}
+.emcp-cta-eyebrow-pill::before {
+	content: '';
+	width: 7px;
+	height: 7px;
+	border-radius: 999px;
+	background: var( --accent, #F4A460 );
+	box-shadow: 0 0 14px var( --accent, #F4A460 );
+	animation: emcpCtaPulse 2.4s ease-in-out infinite;
+}
+@keyframes emcpCtaPulse {
+	0%, 100% { opacity: 1; transform: scale( 1 ); }
+	50%      { opacity: 0.55; transform: scale( 0.7 ); }
+}
+
+/* Headline — display size, tighter */
+body .emcp-cta-headline,
+body .emcp-cta-headline .elementor-heading-title {
+	color: #FFFFFF !important;
+	line-height: 1.08 !important;
+	letter-spacing: -0.02em !important;
+	text-shadow: 0 4px 24px rgba( 0, 0, 0, 0.35 );
+}
+
+body .emcp-cta-subhead p {
+	color: rgba( 255, 255, 255, 0.92 ) !important;
+	font-size: 19px !important;
+	line-height: 1.55 !important;
+	max-width: 620px;
+	margin-left: auto !important;
+	margin-right: auto !important;
+}
+
+/* Button row — pill shape, modern spacing */
+body .emcp-cta-btn-row {
+	margin-top: 6px;
+}
+
+/* Primary button — solid white pill with WhatsApp icon */
+body .emcp-cta-btn-primary .elementor-button {
+	box-shadow: 0 14px 32px rgba( 0, 0, 0, 0.28 ), 0 0 0 0 rgba( 255, 255, 255, 0.35 ) !important;
+	transition: transform 280ms cubic-bezier( 0.16, 1, 0.3, 1 ), box-shadow 280ms ease, background-color 220ms ease !important;
+	font-weight: 700 !important;
+	font-size: 16px !important;
+	letter-spacing: 0.01em !important;
+	position: relative;
+	overflow: hidden;
+}
+body .emcp-cta-btn-primary .elementor-button::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient( 110deg, transparent 0%, rgba( 210, 105, 30, 0.12 ) 50%, transparent 100% );
+	transform: translateX( -100% );
+	transition: transform 600ms cubic-bezier( 0.16, 1, 0.3, 1 );
+	pointer-events: none;
+}
+body .emcp-cta-btn-primary .elementor-button:hover {
+	transform: translateY( -3px ) scale( 1.02 ) !important;
+	box-shadow: 0 20px 44px rgba( 0, 0, 0, 0.36 ), 0 0 0 6px rgba( 255, 255, 255, 0.12 ) !important;
+}
+body .emcp-cta-btn-primary .elementor-button:hover::after {
+	transform: translateX( 100% );
+}
+body .emcp-cta-btn-primary .elementor-button .elementor-button-icon {
+	font-size: 20px;
+	color: #25D366;
+}
+
+/* Secondary button — glass outline ghost */
+body .emcp-cta-btn-secondary .elementor-button {
+	backdrop-filter: blur( 12px );
+	-webkit-backdrop-filter: blur( 12px );
+	transition: background-color 240ms ease, transform 240ms ease, border-color 240ms ease !important;
+	font-weight: 600 !important;
+	font-size: 15px !important;
+}
+body .emcp-cta-btn-secondary .elementor-button:hover {
+	transform: translateY( -3px ) !important;
+	border-color: rgba( 255, 255, 255, 0.75 ) !important;
+}
+body .emcp-cta-btn-secondary .elementor-button .elementor-button-icon {
+	transition: transform 280ms cubic-bezier( 0.16, 1, 0.3, 1 );
+}
+body .emcp-cta-btn-secondary .elementor-button:hover .elementor-button-icon {
+	transform: translateX( 4px );
+}
+
+/* 3-up trust stats row — chips with dividers */
+.emcp-cta-stats {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 0;
+	margin-top: 14px;
+	padding: 14px 24px;
+	background: rgba( 255, 255, 255, 0.06 );
+	border: 1px solid rgba( 255, 255, 255, 0.12 );
+	border-radius: 16px;
+	backdrop-filter: blur( 10px );
+	-webkit-backdrop-filter: blur( 10px );
+}
+.emcp-cta-stat {
+	padding: 4px 24px;
+	text-align: center;
+	position: relative;
+	min-width: 120px;
+}
+.emcp-cta-stat + .emcp-cta-stat::before {
+	content: '';
+	position: absolute;
+	left: 0;
+	top: 20%;
+	bottom: 20%;
+	width: 1px;
+	background: rgba( 255, 255, 255, 0.18 );
+}
+.emcp-cta-stat-val {
+	font-family: 'Playfair Display', Georgia, serif;
+	font-size: 22px;
+	font-weight: 700;
+	color: #FFFFFF;
+	line-height: 1.1;
+	letter-spacing: -0.01em;
+}
+.emcp-cta-stat-lbl {
+	font-size: 11px;
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.12em;
+	color: rgba( 255, 255, 255, 0.72 );
+	margin-top: 4px;
+}
+
+/* Tablet */
+@media ( max-width: 900px ) {
+	body .emcp-cta-headline .elementor-heading-title {
+		font-size: 38px !important;
+	}
+	.emcp-cta-stat { padding: 4px 16px; min-width: 100px; }
+	.emcp-cta-stat-val { font-size: 19px; }
+}
+
+/* Mobile */
+@media ( max-width: 600px ) {
+	body .emcp-cta-btn-row {
+		flex-direction: column !important;
+		gap: 12px !important;
+		width: 100%;
+	}
+	body .emcp-cta-btn-row .elementor-widget-button {
+		width: 100% !important;
+	}
+	body .emcp-cta-btn-row .elementor-button {
+		width: 100% !important;
+		justify-content: center;
+	}
+	body .emcp-cta-headline .elementor-heading-title {
+		font-size: 30px !important;
+	}
+	body .emcp-cta-subhead p {
+		font-size: 15px !important;
+	}
+	.emcp-cta-stats {
+		flex-direction: column;
+		gap: 12px;
+		padding: 16px 18px;
+		width: 100%;
+	}
+	.emcp-cta-stat {
+		padding: 6px 0;
+		width: 100%;
+	}
+	.emcp-cta-stat + .emcp-cta-stat::before {
+		left: 20%;
+		right: 20%;
+		top: 0;
+		bottom: auto;
+		width: auto;
+		height: 1px;
+		background: rgba( 255, 255, 255, 0.12 );
+	}
+	body .emcp-cta-banner::after { display: none; }
+}
+
+/* Mobile: stack */
+@media ( max-width: 600px ) {
+	.emcp-author-card {
+		flex-direction: column !important;
+		text-align: center;
+	}
+	.emcp-author-logo-col {
+		width: 100% !important;
+	}
+	.emcp-author-eyebrow,
+	.emcp-author-name,
+	.emcp-author-tagline {
+		text-align: center !important;
+	}
+	.emcp-author-desc { text-align: center; }
+}
+
+/* ═════════════════════════════════════════════════════
+   v3 LAYOUT — article LEFT + sticky sidebar RIGHT
+   Requires pattern emits:
+     .emcp-article-layout (flex row container)
+       > .emcp-article-main   (LEFT col, article body)
+       > .emcp-article-aside  (RIGHT col, TOC + related + recent)
+   Enhancer JS relocates `.emcp-toc` into the aside slot.
+   ═════════════════════════════════════════════════════ */
+
+.emcp-article-layout {
+	display: grid;
+	grid-template-columns: minmax( 0, 1fr ) 280px;
+	gap: 40px;
+	align-items: start;
+	max-width: 1320px;
+	margin: 0 auto;
+	padding: 0 24px;
+}
+
+.emcp-article-main { min-width: 0; width: 100%; }
+
+/* Post content inside main — neutralize inner boxed caps so article
+   body fills the column width. Targets theme-post-content's nested
+   Elementor page (e.g. post 2192's own boxed containers). */
+.emcp-article-main .elementor-widget-theme-post-content .elementor-widget-container {
+	max-width: none;
+}
+.emcp-article-main .elementor-widget-theme-post-content .e-con-boxed,
+.emcp-article-main .elementor-widget-theme-post-content .e-con-inner {
+	max-width: 100%;
+	padding-left: 0;
+	padding-right: 0;
+}
+
+.emcp-article-aside {
+	position: sticky;
+	top: 24px;
+	align-self: start;
+	max-height: calc( 100vh - 48px );
+	overflow-y: auto;
+	padding-right: 4px;
+	font-size: 14px;
+}
+
+/* Hide scrollbar unless hovered */
+.emcp-article-aside::-webkit-scrollbar { width: 6px; }
+.emcp-article-aside::-webkit-scrollbar-thumb {
+	background: transparent;
+	border-radius: 3px;
+	transition: background 300ms;
+}
+.emcp-article-aside:hover::-webkit-scrollbar-thumb {
+	background: var( --emcp-border );
+}
+
+/* Aside TOC — tighter than inline version */
+.emcp-article-aside .emcp-toc {
+	margin: 0 0 20px;
+	padding: 18px 20px;
+}
+.emcp-article-aside .emcp-toc ol { columns: 1; }
+.emcp-article-aside .emcp-toc li { font-size: 13px; }
+
+/* Aside related / recent sections */
+.emcp-aside-section {
+	margin-bottom: 24px;
+	padding: 18px 20px;
+	background: var( --emcp-surface );
+	border: 1px solid var( --emcp-border );
+	border-radius: 14px;
+}
+.emcp-aside-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.14em;
+	color: var( --emcp-primary );
+	margin: 0 0 14px;
+}
+.emcp-aside-title::before {
+	content: '';
+	width: 14px;
+	height: 2px;
+	background: var( --emcp-accent );
+}
+
+.emcp-aside-posts {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.emcp-aside-posts li {
+	margin: 0 0 12px;
+	padding: 0 0 12px;
+	border-bottom: 1px dashed var( --emcp-border );
+}
+.emcp-aside-posts li:last-child {
+	margin-bottom: 0;
+	padding-bottom: 0;
+	border-bottom: 0;
+}
+.emcp-aside-posts a {
+	display: flex;
+	gap: 10px;
+	text-decoration: none;
+	color: var( --emcp-text );
+	align-items: flex-start;
+	transition: color 150ms;
+}
+.emcp-aside-posts a:hover { color: var( --emcp-primary ); }
+.emcp-aside-posts .emcp-aside-thumb {
+	flex-shrink: 0;
+	width: 64px;
+	height: 48px;
+	border-radius: 8px;
+	object-fit: cover;
+	background: var( --emcp-surf-alt );
+}
+.emcp-aside-posts .emcp-aside-text {
+	flex: 1;
+	min-width: 0;
+}
+.emcp-aside-posts .emcp-aside-title-line {
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.35;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	color: var( --emcp-text );
+}
+.emcp-aside-posts .emcp-aside-date {
+	font-size: 11px;
+	color: var( --emcp-muted );
+	margin-top: 2px;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+/* Left-align article content (override inline centering) */
+.emcp-article-main .emcp-article-meta,
+.emcp-article-main > .emcp-article-content { text-align: left; }
+
+/* Kill inline TOC when aside version is present */
+.emcp-article-layout .emcp-article-main .emcp-toc[data-emcp-auto] {
+	display: none !important;
+}
+
+/* Mobile: stack */
+@media ( max-width: 960px ) {
+	.emcp-article-layout {
+		grid-template-columns: 1fr;
+		gap: 0;
+		padding: 0 16px;
+	}
+	.emcp-article-aside {
+		position: static;
+		max-height: none;
+		overflow: visible;
+		margin-top: 24px;
+	}
+	.emcp-article-aside .emcp-toc ol { columns: 2; }
+}
+@media ( max-width: 600px ) {
+	.emcp-article-aside .emcp-toc ol { columns: 1; }
+}

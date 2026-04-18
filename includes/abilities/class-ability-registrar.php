@@ -134,6 +134,17 @@ class Elementor_MCP_Ability_Registrar {
 		$custom_code->register();
 		$this->ability_names = array_merge( $this->ability_names, $custom_code->get_ability_names() );
 
+		// Design pipeline abilities (list-patterns, preview-pattern, design-page, apply-design-to-page, import-design).
+		// Shares Composite_Abilities for build-page reuse and Stock_Image_Abilities for image resolution.
+		$design_composite = new Elementor_MCP_Composite_Abilities( $this->data, $this->factory );
+		$kit_binder       = new Elementor_MCP_Kit_Binder();
+		$pattern_registry = Elementor_MCP_Pattern_Registry::instance();
+		$design_compiler  = new Elementor_MCP_Design_Compiler( $kit_binder, $pattern_registry, $stock_images );
+		$design_importer  = new Elementor_MCP_Design_Importer();
+		$design           = new Elementor_MCP_Design_Abilities( $this->data, $this->factory, $design_composite, $design_compiler, $pattern_registry, $design_importer );
+		$design->register();
+		$this->ability_names = array_merge( $this->ability_names, $design->get_ability_names() );
+
 		/**
 		 * Filters the registered ability names.
 		 *

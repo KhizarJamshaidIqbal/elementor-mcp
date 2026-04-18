@@ -186,6 +186,7 @@ function elementor_mcp_init(): void {
 	// Design pipeline (v1.5.0+) — additive, non-breaking.
 	require_once ELEMENTOR_MCP_DIR . 'includes/design/helpers/array-merge.php';
 	require_once ELEMENTOR_MCP_DIR . 'includes/design/helpers/responsive.php';
+	require_once ELEMENTOR_MCP_DIR . 'includes/design/helpers/inline-style-parser.php';
 	require_once ELEMENTOR_MCP_DIR . 'includes/design/tokens/palettes.php';
 	require_once ELEMENTOR_MCP_DIR . 'includes/design/tokens/typography.php';
 	require_once ELEMENTOR_MCP_DIR . 'includes/design/tokens/spacing.php';

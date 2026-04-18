@@ -331,18 +331,27 @@ if ( ! function_exists( 'emcp_design_extractor_container' ) ) {
 		$cls   = $el->getAttribute( 'class' );
 		$id    = $el->getAttribute( 'id' );
 
-		$flex_direction = 'column';
-		if ( preg_match( '/display\s*:\s*flex/i', $style ) && preg_match( '/flex-direction\s*:\s*row/i', $style ) ) {
-			$flex_direction = 'row';
-		}
-
+		// Base defaults.
 		$settings = array(
 			'content_width'  => 'full',
-			'flex_direction' => $flex_direction,
+			'flex_direction' => 'column',
 			'css_classes'    => $cls,
 		);
 		if ( $id ) {
 			$settings['_element_id'] = $id;
+		}
+
+		// Merge parsed inline styles (emcp_parse_inline_styles handles flex_direction,
+		// background_color, padding, margin, border_radius, min_height, etc.).
+		if ( '' !== trim( $style ) && function_exists( 'emcp_parse_inline_styles' ) ) {
+			$parsed = emcp_parse_inline_styles( $style );
+			// Parsed may override content_width if max-width is set; otherwise keep 'full'.
+			$settings = array_merge( $settings, $parsed );
+			// Restore css_classes and _element_id which must not be overwritten by parsed.
+			$settings['css_classes'] = $cls;
+			if ( $id ) {
+				$settings['_element_id'] = $id;
+			}
 		}
 
 		return array(

@@ -780,6 +780,10 @@ class Elementor_MCP_Design_Abilities {
 							'type'        => 'boolean',
 							'description' => __( 'Skip <footer> / .site-footer elements. Default true.', 'elementor-mcp' ),
 						),
+						'dry_run'      => array(
+							'type'        => 'boolean',
+							'description' => __( 'When true, parse the HTML and return stats/unmapped_elements WITHOUT saving to any page. Useful for inspecting what the importer would produce before committing. Default false.', 'elementor-mcp' ),
+						),
 					),
 				),
 				'output_schema'       => array(
@@ -825,9 +829,10 @@ class Elementor_MCP_Design_Abilities {
 		$post_status = sanitize_key( $input['post_status'] ?? 'draft' );
 		$skip_header = (bool) ( $input['skip_header'] ?? true );
 		$skip_footer = (bool) ( $input['skip_footer'] ?? true );
+		$dry_run     = (bool) ( $input['dry_run']     ?? false );
 
-		// Must have either page_id or title.
-		if ( $page_id <= 0 && '' === $title ) {
+		// Must have either page_id or title (unless dry_run — no page needed).
+		if ( ! $dry_run && $page_id <= 0 && '' === $title ) {
 			return new \WP_Error(
 				'emcp_import_missing_target',
 				__( 'Provide either page_id (to overwrite an existing page) or title (to create a new page).', 'elementor-mcp' )
@@ -862,6 +867,23 @@ class Elementor_MCP_Design_Abilities {
 
 		// Convert Design IR → Elementor JSON.
 		$elements = $this->realize_structure( $result['structure'] );
+
+		// Dry-run: return stats without persisting anything.
+		if ( $dry_run ) {
+			$dry_stats    = $result['stats'] ?? array();
+			$dry_unmapped = $result['unmapped_elements'] ?? array();
+			return array(
+				'dry_run'              => true,
+				'elements_created'     => count( $elements ),
+				'elements_mapped'      => (int) ( $dry_stats['elements_mapped']      ?? 0 ),
+				'native_widgets'       => (int) ( $dry_stats['native_widgets']       ?? 0 ),
+				'html_fallbacks'       => (int) ( $dry_stats['html_widgets']         ?? 0 ),
+				'accordions_collapsed' => (int) ( $dry_stats['accordions_collapsed'] ?? 0 ),
+				'tokens_extracted'     => is_array( $result['tokens']['raw'] ?? null ) ? count( $result['tokens']['raw'] ) : 0,
+				'unmapped_elements'    => $dry_unmapped,
+				'needs_review'         => count( array_filter( $dry_unmapped, fn( $u ) => 'no_rule_leaf' === $u['reason'] ) ) > 0,
+			);
+		}
 
 		// Apply to page_id or create a new page.
 		if ( $page_id > 0 ) {

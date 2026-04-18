@@ -706,7 +706,17 @@ body .emcp-faqpage .pop-card:hover .elementor-icon-box-icon .elementor-icon svg 
 .emcp-faqpage #faq-accordion,
 .emcp-faqpage .faq-library {
   background: var(--g-sand);
-  position: relative; overflow: hidden;
+  position: relative;
+  /* Must stay `visible` — `hidden` here creates a scroll-containing block
+     that kills position:sticky on .faq-aside. Gradient ::before is already
+     clipped by its own inset:0 + pointer-events:none. */
+  overflow: visible !important;
+}
+/* Clip the decorative radial gradient via the pseudo's own box, not the
+   parent — keeps sticky working while still preventing any gradient bleed. */
+.emcp-faqpage #faq-accordion::before,
+.emcp-faqpage .faq-library::before {
+  overflow: hidden;
 }
 .emcp-faqpage #faq-accordion::before,
 .emcp-faqpage .faq-library::before {

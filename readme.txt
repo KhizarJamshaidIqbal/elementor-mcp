@@ -3,7 +3,7 @@ Contributors: mianshahzadraza
 Tags: elementor, mcp, ai, page-builder, automation
 Requires at least: 6.7
 Tested up to: 6.9
-Stable tag: 1.4.3
+Stable tag: 1.7.5
 Requires PHP: 7.4
 
 Extends the WordPress MCP Adapter to expose Elementor data, widgets, page lookup, page duplication, and page design tools as MCP tools for AI agents.
@@ -17,6 +17,7 @@ MCP Tools for Elementor bridges the gap between AI tools and Elementor page desi
 * **Page Lookup** — Resolve Elementor-built pages by post ID or slug and return compact IDs or rich page payloads.
 * **Page Duplication** — Duplicate Elementor-built pages/posts/CPTs with copied post fields, taxonomies, post meta, and refreshed Elementor CSS.
 * **Companion CLI** — Run `@elementor-mcp/cli` in endpoint mode for portable MCP setup or in REST fallback mode for page/file workflows.
+* **Authenticated Menu + Template Reads** — Inspect navigation menus and Elementor templates through MCP tools or plugin-owned authenticated REST routes without making them public.
 
 * **Query & Discovery** — List widgets, inspect page structures, read element settings, browse templates, and view global design tokens.
 * **Page Management** — Create pages, duplicate Elementor pages, update page settings, clear content, import/export templates.
@@ -139,6 +140,57 @@ npx @elementor-mcp/cli \
 
 Switch `--mode=rest` to use the limited WordPress REST fallback server for page/file workflows such as `get_page`, `get_page_by_slug`, `duplicate_page`, `download_page_to_file`, and `update_page_from_file`.
 
+== Health Checks ==
+
+Use Application Password authentication for all HTTP-based checks below.
+
+= MCP endpoint reachable with auth =
+
+`
+curl -i -u "admin:APP_PASSWORD" \
+  https://your-site.com/wp-json/mcp/elementor-mcp-server
+`
+
+Expected result: the request should no longer fail with `401` or `403`. A different status such as `400` or `405` still confirms auth is being accepted by the MCP endpoint.
+
+= Plugin-owned authenticated REST routes =
+
+`
+curl -u "admin:APP_PASSWORD" \
+  https://your-site.com/wp-json/elementor-mcp/v1/templates
+`
+
+`
+curl -u "admin:APP_PASSWORD" \
+  https://your-site.com/wp-json/elementor-mcp/v1/templates/123
+`
+
+`
+curl -u "admin:APP_PASSWORD" \
+  https://your-site.com/wp-json/elementor-mcp/v1/menus
+`
+
+`
+curl -u "admin:APP_PASSWORD" \
+  https://your-site.com/wp-json/elementor-mcp/v1/menus/7
+`
+
+Expected result: authenticated JSON responses with template/menu data. Unauthenticated requests should still return `401` or `403`.
+
+= Optional core wp/v2 checks =
+
+`
+curl -u "admin:APP_PASSWORD" \
+  "https://your-site.com/wp-json/wp/v2/elementor_library?per_page=5"
+`
+
+`
+curl -u "admin:APP_PASSWORD" \
+  "https://your-site.com/wp-json/wp/v2/menu-items?per_page=5"
+`
+
+These core endpoints remain WordPress-controlled and may still be restricted on some sites. If they fail while the plugin-owned `/wp-json/elementor-mcp/v1/*` routes succeed, use the plugin routes as the supported authenticated fallback.
+
 == Frequently Asked Questions ==
 
 = What is MCP? =
@@ -167,6 +219,12 @@ The plugin enforces WordPress capability checks on every tool. Read operations r
 2. Connection configuration page with copy-paste configs.
 
 == Changelog ==
+
+= 1.7.5 =
+* New: Added authenticated read-only MCP tools for navigation menus and rich Elementor template inspection.
+* New: Added plugin-owned authenticated REST fallback routes under `/wp-json/elementor-mcp/v1/menus` and `/wp-json/elementor-mcp/v1/templates`.
+* Improved: Template listing now supports status filtering and returns richer summary metadata for inspection clients.
+* Improved: Added documented health checks for MCP auth, plugin-owned REST auth, and optional core `wp/v2` compatibility verification.
 
 = 1.4.3 =
 * Fixed: Removed empty string values from enum arrays in JSON Schema output for Gemini API compatibility (Antigravity support).
@@ -249,6 +307,9 @@ The plugin enforces WordPress capability checks on every tool. Read operations r
 * Node.js HTTP proxy for remote connections.
 
 == Upgrade Notice ==
+
+= 1.7.5 =
+Adds authenticated menu and Elementor template inspection through MCP plus plugin-owned REST fallback routes, without making core WordPress endpoints public.
 
 = 1.4.3 =
 Fixes Gemini API compatibility — removes empty enum values and adds missing array items schema for Antigravity and other non-Claude MCP clients.

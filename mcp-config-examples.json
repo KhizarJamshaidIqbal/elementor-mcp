@@ -1,5 +1,16 @@
 {
   "_comment": "Copy-paste MCP configurations for connecting to the MCP Tools for Elementor server. Pick the one that matches your client and environment.",
+  "_health_checks_comment": "Use Application Password auth for all HTTP checks. Plugin-owned authenticated fallback routes live under /wp-json/elementor-mcp/v1/.",
+
+  "health_checks": {
+    "mcp_endpoint": "curl -i -u \"admin:APP_PASSWORD\" https://your-site.com/wp-json/mcp/elementor-mcp-server",
+    "plugin_templates_list": "curl -u \"admin:APP_PASSWORD\" https://your-site.com/wp-json/elementor-mcp/v1/templates",
+    "plugin_template_detail": "curl -u \"admin:APP_PASSWORD\" https://your-site.com/wp-json/elementor-mcp/v1/templates/123",
+    "plugin_menus_list": "curl -u \"admin:APP_PASSWORD\" https://your-site.com/wp-json/elementor-mcp/v1/menus",
+    "plugin_menu_detail": "curl -u \"admin:APP_PASSWORD\" https://your-site.com/wp-json/elementor-mcp/v1/menus/7",
+    "core_elementor_library_optional": "curl -u \"admin:APP_PASSWORD\" \"https://your-site.com/wp-json/wp/v2/elementor_library?per_page=5\"",
+    "core_menu_items_optional": "curl -u \"admin:APP_PASSWORD\" \"https://your-site.com/wp-json/wp/v2/menu-items?per_page=5\""
+  },
 
   "claude_desktop_local_wpcli": {
     "_description": "Claude Desktop — local WordPress via WP-CLI (fastest, recommended for local dev)",

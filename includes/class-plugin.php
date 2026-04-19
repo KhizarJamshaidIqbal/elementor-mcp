@@ -114,6 +114,7 @@ class Elementor_MCP_Plugin {
 		// Register hooks.
 		add_action( 'wp_abilities_api_categories_init', array( $this, 'register_category' ) );
 		add_action( 'wp_abilities_api_init', array( $this, 'register_abilities' ) );
+		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 
 		// The Abilities API is lazy-loaded: wp_abilities_api_init fires on first
 		// wp_get_ability() call. The default MCP server's tool registration triggers
@@ -148,6 +149,19 @@ class Elementor_MCP_Plugin {
 	 */
 	public function register_abilities(): void {
 		$this->ability_names = $this->registrar->register_all();
+	}
+
+	/**
+	 * Registers plugin-owned authenticated REST routes used for read fallbacks.
+	 *
+	 * These routes are separate from the MCP transport route so clients can
+	 * still inspect menus/templates when the MCP binding is unavailable.
+	 *
+	 * @since 1.7.5
+	 */
+	public function register_rest_routes(): void {
+		$query = new Elementor_MCP_Query_Abilities( $this->data, $this->schema_generator );
+		$query->register_rest_routes();
 	}
 
 	/**

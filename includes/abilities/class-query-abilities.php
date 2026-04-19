@@ -66,7 +66,10 @@ class Elementor_MCP_Query_Abilities {
 			'elementor-mcp/get-page',
 			'elementor-mcp/get-page-by-slug',
 			'elementor-mcp/get-page-id-by-slug',
+			'elementor-mcp/list-menus',
+			'elementor-mcp/get-menu',
 			'elementor-mcp/list-templates',
+			'elementor-mcp/get-template',
 			'elementor-mcp/get-global-settings',
 		);
 	}
@@ -89,8 +92,58 @@ class Elementor_MCP_Query_Abilities {
 		$this->register_get_page();
 		$this->register_get_page_by_slug();
 		$this->register_get_page_id_by_slug();
+		$this->register_list_menus();
+		$this->register_get_menu();
 		$this->register_list_templates();
+		$this->register_get_template();
 		$this->register_get_global_settings();
+	}
+
+	/**
+	 * Registers plugin-owned authenticated REST routes for read fallbacks.
+	 *
+	 * @since 1.7.5
+	 */
+	public function register_rest_routes(): void {
+		register_rest_route(
+			'elementor-mcp/v1',
+			'/menus',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'rest_list_menus' ),
+				'permission_callback' => array( $this, 'check_read_permission' ),
+			)
+		);
+
+		register_rest_route(
+			'elementor-mcp/v1',
+			'/menus/(?P<menu_id>[^/]+)',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'rest_get_menu' ),
+				'permission_callback' => array( $this, 'check_read_permission' ),
+			)
+		);
+
+		register_rest_route(
+			'elementor-mcp/v1',
+			'/templates',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'rest_list_templates' ),
+				'permission_callback' => array( $this, 'check_read_permission' ),
+			)
+		);
+
+		register_rest_route(
+			'elementor-mcp/v1',
+			'/templates/(?P<template_id>[^/]+)',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'rest_get_template' ),
+				'permission_callback' => array( $this, 'check_read_permission' ),
+			)
+		);
 	}
 
 	/**
@@ -908,6 +961,68 @@ class Elementor_MCP_Query_Abilities {
 	}
 
 	/**
+	 * Returns the JSON Schema for a menu summary payload.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function get_menu_summary_schema(): array {
+		return array(
+			'type'       => 'object',
+			'properties' => array(
+				'id'          => array( 'type' => 'integer' ),
+				'name'        => array( 'type' => 'string' ),
+				'slug'        => array( 'type' => 'string' ),
+				'description' => array( 'type' => 'string' ),
+				'item_count'  => array( 'type' => 'integer' ),
+				'locations'   => array(
+					'type'  => 'array',
+					'items' => array(
+						'type'       => 'object',
+						'properties' => array(
+							'slug'  => array( 'type' => 'string' ),
+							'label' => array( 'type' => 'string' ),
+						),
+					),
+				),
+			),
+		);
+	}
+
+	/**
+	 * Returns the JSON Schema for detailed menu payloads.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function get_menu_detail_schema(): array {
+		return array(
+			'type'       => 'object',
+			'properties' => array(
+				'id'          => array( 'type' => 'integer' ),
+				'name'        => array( 'type' => 'string' ),
+				'slug'        => array( 'type' => 'string' ),
+				'description' => array( 'type' => 'string' ),
+				'item_count'  => array( 'type' => 'integer' ),
+				'locations'   => array(
+					'type'  => 'array',
+					'items' => array( 'type' => 'object' ),
+				),
+				'items'       => array(
+					'type'  => 'array',
+					'items' => array( 'type' => 'object' ),
+				),
+				'flat_items'  => array(
+					'type'  => 'array',
+					'items' => array( 'type' => 'object' ),
+				),
+			),
+		);
+	}
+
+	/**
 	 * Registers the list-pages ability.
 	 *
 	 * @since 1.0.0
@@ -1196,6 +1311,118 @@ class Elementor_MCP_Query_Abilities {
 	}
 
 	/**
+	 * Registers the list-menus ability.
+	 *
+	 * @since 1.7.5
+	 */
+	private function register_list_menus(): void {
+		elementor_mcp_register_ability(
+			'elementor-mcp/list-menus',
+			array(
+				'label'               => __( 'List Navigation Menus', 'elementor-mcp' ),
+				'description'         => __( 'Returns all navigation menus with IDs, names, slugs, item counts, and assigned theme locations.', 'elementor-mcp' ),
+				'category'            => 'elementor-mcp',
+				'execute_callback'    => array( $this, 'execute_list_menus' ),
+				'permission_callback' => array( $this, 'check_read_permission' ),
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => new \stdClass(),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'menus' => array(
+							'type'  => 'array',
+							'items' => $this->get_menu_summary_schema(),
+						),
+					),
+				),
+				'meta'                => array(
+					'annotations'  => array(
+						'readonly'    => true,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+					'show_in_rest' => true,
+				),
+			)
+		);
+	}
+
+	/**
+	 * Executes the list-menus ability.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param array|null $input The input parameters (unused).
+	 * @return array Menu list payload.
+	 */
+	public function execute_list_menus( $input = null ): array {
+		return array(
+			'menus' => $this->data->list_nav_menus(),
+		);
+	}
+
+	/**
+	 * Registers the get-menu ability.
+	 *
+	 * @since 1.7.5
+	 */
+	private function register_get_menu(): void {
+		elementor_mcp_register_ability(
+			'elementor-mcp/get-menu',
+			array(
+				'label'               => __( 'Get Navigation Menu', 'elementor-mcp' ),
+				'description'         => __( 'Returns a full nested navigation menu structure with menu item metadata, linked objects, and child relationships.', 'elementor-mcp' ),
+				'category'            => 'elementor-mcp',
+				'execute_callback'    => array( $this, 'execute_get_menu' ),
+				'permission_callback' => array( $this, 'check_read_permission' ),
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'menu_id' => array(
+							'type'        => 'integer',
+							'description' => __( 'The navigation menu term ID.', 'elementor-mcp' ),
+						),
+					),
+					'required'   => array( 'menu_id' ),
+				),
+				'output_schema'       => $this->get_menu_detail_schema(),
+				'meta'                => array(
+					'annotations'  => array(
+						'readonly'    => true,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+					'show_in_rest' => true,
+				),
+			)
+		);
+	}
+
+	/**
+	 * Executes the get-menu ability.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param array $input The input parameters.
+	 * @return array|\WP_Error Menu payload or WP_Error.
+	 */
+	public function execute_get_menu( $input ) {
+		$menu_id = absint( $input['menu_id'] ?? 0 );
+
+		if ( ! $menu_id ) {
+			return new \WP_Error(
+				'invalid_menu_id',
+				__( 'A valid menu_id parameter is required.', 'elementor-mcp' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		return $this->data->get_nav_menu_payload( $menu_id );
+	}
+
+	/**
 	 * Registers the list-templates ability.
 	 *
 	 * @since 1.0.0
@@ -1205,7 +1432,7 @@ class Elementor_MCP_Query_Abilities {
 			'elementor-mcp/list-templates',
 			array(
 				'label'               => __( 'List Elementor Templates', 'elementor-mcp' ),
-				'description'         => __( 'Returns all saved Elementor templates from the template library. Optionally filter by template type (page, section, container).', 'elementor-mcp' ),
+				'description'         => __( 'Returns saved Elementor templates from the template library. Optionally filter by template type and post status.', 'elementor-mcp' ),
 				'category'            => 'elementor-mcp',
 				'execute_callback'    => array( $this, 'execute_list_templates' ),
 				'permission_callback' => array( $this, 'check_read_permission' ),
@@ -1215,6 +1442,10 @@ class Elementor_MCP_Query_Abilities {
 						'template_type' => array(
 							'type'        => 'string',
 							'description' => __( 'Filter by template type (e.g. "page", "section", "container").', 'elementor-mcp' ),
+						),
+						'status'        => array(
+							'type'        => 'string',
+							'description' => __( 'Filter by post status. Defaults to "publish". Use "any" to inspect drafts and other template states.', 'elementor-mcp' ),
 						),
 					),
 				),
@@ -1226,10 +1457,13 @@ class Elementor_MCP_Query_Abilities {
 							'items' => array(
 								'type'       => 'object',
 								'properties' => array(
-									'id'    => array( 'type' => 'integer' ),
-									'title' => array( 'type' => 'string' ),
-									'type'  => array( 'type' => 'string' ),
-									'date'  => array( 'type' => 'string' ),
+									'id'       => array( 'type' => 'integer' ),
+									'title'    => array( 'type' => 'string' ),
+									'slug'     => array( 'type' => 'string' ),
+									'status'   => array( 'type' => 'string' ),
+									'type'     => array( 'type' => 'string' ),
+									'date'     => array( 'type' => 'string' ),
+									'modified' => array( 'type' => 'string' ),
 								),
 							),
 						),
@@ -1255,39 +1489,174 @@ class Elementor_MCP_Query_Abilities {
 	 * @param array|null $input The input parameters.
 	 * @return array The templates list.
 	 */
-	public function execute_list_templates( $input = null ): array {
+	public function execute_list_templates( $input = null ) {
 		$template_type = sanitize_text_field( $input['template_type'] ?? '' );
-
-		$query_args = array(
-			'post_type'      => 'elementor_library',
-			'post_status'    => 'publish',
-			'posts_per_page' => 100,
-			'orderby'        => 'date',
-			'order'          => 'DESC',
+		$status        = sanitize_text_field( $input['status'] ?? 'publish' );
+		$templates     = $this->data->list_elementor_templates(
+			array(
+				'template_type' => $template_type,
+				'status'        => $status,
+			)
 		);
 
-		if ( ! empty( $template_type ) ) {
-			$query_args['meta_query'] = array(
-				array(
-					'key'   => '_elementor_template_type',
-					'value' => $template_type,
-				),
-			);
-		}
-
-		$query     = new \WP_Query( $query_args );
-		$templates = array();
-
-		foreach ( $query->posts as $post ) {
-			$templates[] = array(
-				'id'    => $post->ID,
-				'title' => $post->post_title,
-				'type'  => get_post_meta( $post->ID, '_elementor_template_type', true ),
-				'date'  => $post->post_date,
-			);
+		if ( is_wp_error( $templates ) ) {
+			return $templates;
 		}
 
 		return array( 'templates' => $templates );
+	}
+
+	/**
+	 * Registers the get-template ability.
+	 *
+	 * @since 1.7.5
+	 */
+	private function register_get_template(): void {
+		elementor_mcp_register_ability(
+			'elementor-mcp/get-template',
+			array(
+				'label'               => __( 'Get Elementor Template', 'elementor-mcp' ),
+				'description'         => __( 'Returns a full inspect payload for one Elementor template, including metadata, conditions, page settings, full element tree, and simplified structure.', 'elementor-mcp' ),
+				'category'            => 'elementor-mcp',
+				'execute_callback'    => array( $this, 'execute_get_template' ),
+				'permission_callback' => array( $this, 'check_read_permission' ),
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'template_id' => array(
+							'type'        => 'integer',
+							'description' => __( 'The Elementor template post ID.', 'elementor-mcp' ),
+						),
+					),
+					'required'   => array( 'template_id' ),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'post_id'             => array( 'type' => 'integer' ),
+						'post_type'           => array( 'type' => 'string' ),
+						'slug'                => array( 'type' => 'string' ),
+						'title'               => array( 'type' => 'string' ),
+						'status'              => array( 'type' => 'string' ),
+						'link'                => array( 'type' => 'string' ),
+						'modified'            => array( 'type' => 'string' ),
+						'featured_image'      => $this->get_featured_image_schema(),
+						'elementor_enabled'   => array( 'type' => 'boolean' ),
+						'document_type'       => array( 'type' => 'string' ),
+						'template_type'       => array( 'type' => 'string' ),
+						'template_type_terms' => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'string' ),
+						),
+						'display_conditions'  => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'array' ),
+						),
+						'page_settings'       => array( 'type' => 'object' ),
+						'element_count'       => array( 'type' => 'integer' ),
+						'elements'            => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'object' ),
+						),
+						'structure'           => array(
+							'type'  => 'array',
+							'items' => array( 'type' => 'object' ),
+						),
+					),
+				),
+				'meta'                => array(
+					'annotations'  => array(
+						'readonly'    => true,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+					'show_in_rest' => true,
+				),
+			)
+		);
+	}
+
+	/**
+	 * Executes the get-template ability.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param array $input The input parameters.
+	 * @return array|\WP_Error Template inspect payload or WP_Error.
+	 */
+	public function execute_get_template( $input ) {
+		$template_id = absint( $input['template_id'] ?? 0 );
+
+		if ( ! $template_id ) {
+			return new \WP_Error(
+				'invalid_template_id',
+				__( 'A valid template_id parameter is required.', 'elementor-mcp' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		return $this->data->get_rich_template_payload( $template_id );
+	}
+
+	/**
+	 * REST callback for listing menus.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return array
+	 */
+	public function rest_list_menus( \WP_REST_Request $request ): array {
+		return $this->execute_list_menus();
+	}
+
+	/**
+	 * REST callback for returning one menu payload.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return array|\WP_Error
+	 */
+	public function rest_get_menu( \WP_REST_Request $request ) {
+		return $this->execute_get_menu(
+			array(
+				'menu_id' => $request->get_param( 'menu_id' ),
+			)
+		);
+	}
+
+	/**
+	 * REST callback for listing templates.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return array|\WP_Error
+	 */
+	public function rest_list_templates( \WP_REST_Request $request ) {
+		return $this->execute_list_templates(
+			array(
+				'template_type' => $request->get_param( 'template_type' ),
+				'status'        => $request->get_param( 'status' ),
+			)
+		);
+	}
+
+	/**
+	 * REST callback for returning one template payload.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return array|\WP_Error
+	 */
+	public function rest_get_template( \WP_REST_Request $request ) {
+		return $this->execute_get_template(
+			array(
+				'template_id' => $request->get_param( 'template_id' ),
+			)
+		);
 	}
 
 	/**

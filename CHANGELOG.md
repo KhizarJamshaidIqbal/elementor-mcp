@@ -4,6 +4,42 @@ All notable changes to MCP Tools for Elementor are documented in this file.
 
 ## [Unreleased]
 
+### v1.7.5 — Authenticated menu + template reads (2026-04-18)
+
+Adds safe, authenticated inspection access for WordPress navigation menus
+and Elementor templates without weakening core WordPress REST permissions.
+
+**New MCP read tools**
+- `elementor-mcp/list-menus` — lists menus with ID, name, slug, item count,
+  and assigned theme locations
+- `elementor-mcp/get-menu` — returns nested menu structure, item metadata,
+  parent/child hierarchy, linked-object resolution, and invalid/missing-link flags
+- `elementor-mcp/get-template` — returns full Elementor template inspection
+  payload with metadata, display conditions, page settings, full element tree,
+  and simplified structure summary
+
+**New authenticated REST fallback routes**
+- `GET /wp-json/elementor-mcp/v1/menus`
+- `GET /wp-json/elementor-mcp/v1/menus/<id>`
+- `GET /wp-json/elementor-mcp/v1/templates`
+- `GET /wp-json/elementor-mcp/v1/templates/<id>`
+
+**Implementation notes**
+- New plugin-owned routes use the same `edit_posts` capability gate as the
+  plugin's existing read tools
+- Core `wp/v2/menu-items` and `wp/v2/elementor_library` remain untouched and
+  auth-controlled by WordPress itself
+- Data layer now supports reusable menu listing, nested menu inspection,
+  template listing with status/type filters, and rich template payload assembly
+
+**Docs**
+- Added authenticated health-check examples to `readme.txt`
+- Added matching config/verification examples to `mcp-config-examples.json`
+
+**Version bump:** `ELEMENTOR_MCP_VERSION` → `1.7.5`.
+
+---
+
 ### v1.7.4 — Iron Laws + FAQ page migration (2026-04-18)
 
 **Architectural lesson, permanently recorded.** Plugin violated its own

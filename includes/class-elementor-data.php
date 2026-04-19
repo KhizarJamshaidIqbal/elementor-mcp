@@ -307,6 +307,208 @@ class Elementor_MCP_Data {
 	}
 
 	/**
+	 * Lists Elementor templates with optional filters.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param array $filters Optional filters.
+	 * @return array|\WP_Error Template list or WP_Error.
+	 */
+	public function list_elementor_templates( array $filters = array() ) {
+		$template_type = sanitize_key( (string) ( $filters['template_type'] ?? '' ) );
+		$status        = sanitize_key( (string) ( $filters['status'] ?? 'publish' ) );
+
+		if ( '' !== $status && 'any' !== $status ) {
+			$allowed_statuses = get_post_stati( array(), 'names' );
+			if ( ! in_array( $status, $allowed_statuses, true ) ) {
+				return new \WP_Error(
+					'invalid_template_status',
+					__( 'Invalid template status provided.', 'elementor-mcp' ),
+					array( 'status' => 400 )
+				);
+			}
+		}
+
+		$query_args = array(
+			'post_type'      => 'elementor_library',
+			'post_status'    => 'any' === $status ? 'any' : $status,
+			'posts_per_page' => 100,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+		);
+
+		if ( '' !== $template_type ) {
+			$query_args['meta_query'] = array(
+				array(
+					'key'   => '_elementor_template_type',
+					'value' => $template_type,
+				),
+			);
+		}
+
+		$query     = new \WP_Query( $query_args );
+		$templates = array();
+
+		foreach ( $query->posts as $post ) {
+			$templates[] = $this->get_template_list_item( $post );
+		}
+
+		return $templates;
+	}
+
+	/**
+	 * Gets an Elementor template post by ID.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param int $post_id The template post ID.
+	 * @return \WP_Post|\WP_Error Template post or WP_Error.
+	 */
+	public function get_elementor_template_post( int $post_id ) {
+		$post = get_post( $post_id );
+
+		if ( ! $post ) {
+			return new \WP_Error(
+				'template_not_found',
+				__( 'Template not found.', 'elementor-mcp' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		if ( 'elementor_library' !== $post->post_type ) {
+			return new \WP_Error(
+				'not_elementor_template',
+				__( 'The requested content is not an Elementor template.', 'elementor-mcp' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		return $post;
+	}
+
+	/**
+	 * Builds a rich template payload used by MCP and REST read tools.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param int $post_id The template post ID.
+	 * @return array|\WP_Error Rich payload or WP_Error.
+	 */
+	public function get_rich_template_payload( int $post_id ) {
+		$post = $this->get_elementor_template_post( $post_id );
+
+		if ( is_wp_error( $post ) ) {
+			return $post;
+		}
+
+		$elements      = $this->get_page_data( $post_id );
+		$page_settings = $this->get_page_settings( $post_id );
+
+		if ( is_wp_error( $elements ) ) {
+			return $elements;
+		}
+
+		if ( is_wp_error( $page_settings ) ) {
+			return $page_settings;
+		}
+
+		$template_type = $this->resolve_elementor_template_type( $post_id );
+
+		return array(
+			'post_id'             => $post->ID,
+			'post_type'           => $post->post_type,
+			'slug'                => $post->post_name,
+			'title'               => $post->post_title,
+			'status'              => $post->post_status,
+			'link'                => get_permalink( $post->ID ) ?: '',
+			'modified'            => $post->post_modified,
+			'featured_image'      => $this->get_featured_image_data( $post->ID ),
+			'elementor_enabled'   => $this->is_elementor_page( $post_id ),
+			'document_type'       => $template_type,
+			'template_type'       => $template_type,
+			'template_type_terms' => $this->get_elementor_template_terms( $post_id ),
+			'display_conditions'  => $this->get_template_display_conditions( $post_id ),
+			'page_settings'       => $page_settings,
+			'element_count'       => $this->count_elements( $elements ),
+			'elements'            => $elements,
+			'structure'           => $this->simplify_element_structure( $elements ),
+		);
+	}
+
+	/**
+	 * Lists navigation menus and assigned theme locations.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @return array Menu list payloads.
+	 */
+	public function list_nav_menus(): array {
+		$menus         = wp_get_nav_menus();
+		$location_map  = $this->get_nav_menu_location_map();
+		$results       = array();
+
+		foreach ( $menus as $menu ) {
+			$results[] = array(
+				'id'          => intval( $menu->term_id ),
+				'name'        => (string) $menu->name,
+				'slug'        => (string) $menu->slug,
+				'description' => (string) $menu->description,
+				'item_count'  => intval( $menu->count ),
+				'locations'   => $location_map[ intval( $menu->term_id ) ] ?? array(),
+			);
+		}
+
+		return $results;
+	}
+
+	/**
+	 * Builds a full navigation menu payload.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param int $menu_id The nav menu term ID.
+	 * @return array|\WP_Error Menu payload or WP_Error.
+	 */
+	public function get_nav_menu_payload( int $menu_id ) {
+		$menu = wp_get_nav_menu_object( $menu_id );
+
+		if ( ! $menu ) {
+			return new \WP_Error(
+				'menu_not_found',
+				__( 'Navigation menu not found.', 'elementor-mcp' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$items = wp_get_nav_menu_items(
+			$menu->term_id,
+			array(
+				'post_status' => 'any',
+			)
+		);
+
+		if ( is_wp_error( $items ) ) {
+			return $items;
+		}
+
+		$flat_items = array();
+		foreach ( (array) $items as $item ) {
+			$flat_items[] = $this->normalize_nav_menu_item( $item );
+		}
+
+		return array(
+			'id'          => intval( $menu->term_id ),
+			'name'        => (string) $menu->name,
+			'slug'        => (string) $menu->slug,
+			'description' => (string) $menu->description,
+			'item_count'  => count( $flat_items ),
+			'locations'   => $this->get_nav_menu_location_map()[ intval( $menu->term_id ) ] ?? array(),
+			'items'       => $this->nest_nav_menu_items( $flat_items ),
+			'flat_items'  => $flat_items,
+		);
+	}
+
+	/**
 	 * Updates safe core WordPress post fields without touching Elementor data.
 	 *
 	 * @since 1.4.4
@@ -1014,6 +1216,346 @@ class Elementor_MCP_Data {
 		}
 
 		return (string) $template;
+	}
+
+	/**
+	 * Builds a lightweight template list item.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param \WP_Post $post Template post.
+	 * @return array<string, mixed> Template summary.
+	 */
+	private function get_template_list_item( \WP_Post $post ): array {
+		return array(
+			'id'       => $post->ID,
+			'title'    => $post->post_title,
+			'slug'     => $post->post_name,
+			'status'   => $post->post_status,
+			'type'     => $this->resolve_elementor_template_type( $post->ID ),
+			'date'     => $post->post_date,
+			'modified' => $post->post_modified,
+		);
+	}
+
+	/**
+	 * Resolves the canonical Elementor template type for a template post.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param int $post_id Template post ID.
+	 * @return string Template type slug or empty string.
+	 */
+	private function resolve_elementor_template_type( int $post_id ): string {
+		$template_type = (string) get_post_meta( $post_id, '_elementor_template_type', true );
+
+		if ( '' !== $template_type ) {
+			return $template_type;
+		}
+
+		$terms = $this->get_elementor_template_terms( $post_id );
+
+		return $terms[0] ?? '';
+	}
+
+	/**
+	 * Gets Elementor template type taxonomy terms for a template post.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param int $post_id Template post ID.
+	 * @return string[] Template type slugs.
+	 */
+	private function get_elementor_template_terms( int $post_id ): array {
+		$terms = wp_get_post_terms(
+			$post_id,
+			'elementor_library_type',
+			array(
+				'fields' => 'slugs',
+			)
+		);
+
+		if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
+			return array();
+		}
+
+		return array_values( array_map( 'strval', $terms ) );
+	}
+
+	/**
+	 * Gets normalized display conditions for a template.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param int $post_id Template post ID.
+	 * @return array Display conditions.
+	 */
+	private function get_template_display_conditions( int $post_id ): array {
+		$conditions = get_post_meta( $post_id, '_elementor_conditions', true );
+
+		if ( is_array( $conditions ) ) {
+			return $conditions;
+		}
+
+		return array();
+	}
+
+	/**
+	 * Creates a simplified element tree for inspection UIs.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param array $elements Raw Elementor elements.
+	 * @return array Simplified structure.
+	 */
+	private function simplify_element_structure( array $elements ): array {
+		$result = array();
+
+		foreach ( $elements as $element ) {
+			$item = array(
+				'id'     => $element['id'] ?? '',
+				'elType' => $element['elType'] ?? '',
+			);
+
+			if ( ! empty( $element['widgetType'] ) ) {
+				$item['widgetType'] = $element['widgetType'];
+			}
+
+			if ( ! empty( $element['settings'] ) && is_array( $element['settings'] ) ) {
+				$key_settings = $this->extract_structure_settings_summary( $element );
+				if ( ! empty( $key_settings ) ) {
+					$item['settings_summary'] = $key_settings;
+				}
+			}
+
+			if ( ! empty( $element['elements'] ) && is_array( $element['elements'] ) ) {
+				$item['elements'] = $this->simplify_element_structure( $element['elements'] );
+			}
+
+			$result[] = $item;
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Extracts a short settings summary for structure responses.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param array $element Elementor element array.
+	 * @return array<string, mixed> Short settings summary.
+	 */
+	private function extract_structure_settings_summary( array $element ): array {
+		$settings = $element['settings'] ?? array();
+		$summary  = array();
+
+		foreach ( array( 'title', 'editor', 'text', 'image', 'link', 'html', 'header_size' ) as $field ) {
+			if ( ! isset( $settings[ $field ] ) || '' === $settings[ $field ] ) {
+				continue;
+			}
+
+			$value = $settings[ $field ];
+			if ( is_string( $value ) && strlen( $value ) > 100 ) {
+				$value = substr( $value, 0, 100 ) . '...';
+			}
+			$summary[ $field ] = $value;
+		}
+
+		if ( 'container' === ( $element['elType'] ?? '' ) ) {
+			foreach ( array( 'flex_direction', 'content_width', 'container_type' ) as $field ) {
+				if ( isset( $settings[ $field ] ) && '' !== $settings[ $field ] ) {
+					$summary[ $field ] = $settings[ $field ];
+				}
+			}
+		}
+
+		return $summary;
+	}
+
+	/**
+	 * Returns a map of menu term IDs to assigned theme locations.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @return array<int, array<int, array<string, string>>> Menu location map.
+	 */
+	private function get_nav_menu_location_map(): array {
+		$assigned   = get_nav_menu_locations();
+		$registered = get_registered_nav_menus();
+		$map        = array();
+
+		foreach ( $assigned as $location => $menu_id ) {
+			$menu_id = intval( $menu_id );
+			if ( $menu_id <= 0 ) {
+				continue;
+			}
+
+			if ( ! isset( $map[ $menu_id ] ) ) {
+				$map[ $menu_id ] = array();
+			}
+
+			$map[ $menu_id ][] = array(
+				'slug'  => (string) $location,
+				'label' => (string) ( $registered[ $location ] ?? $location ),
+			);
+		}
+
+		return $map;
+	}
+
+	/**
+	 * Normalizes a WordPress nav menu item into a stable payload.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param \WP_Post $item Nav menu item post.
+	 * @return array<string, mixed> Normalized menu item.
+	 */
+	private function normalize_nav_menu_item( \WP_Post $item ): array {
+		$linked_object = $this->normalize_nav_menu_linked_object( $item );
+		$item_classes  = array_values(
+			array_filter(
+				array_map(
+					'strval',
+					array_filter( (array) $item->classes )
+				)
+			)
+		);
+
+		return array(
+			'id'                    => intval( $item->ID ),
+			'db_id'                 => intval( $item->db_id ),
+			'label'                 => (string) $item->title,
+			'title'                 => (string) $item->title,
+			'url'                   => (string) ( $item->url ?: ( $linked_object['url'] ?? '' ) ),
+			'target'                => (string) $item->target,
+			'attr_title'            => (string) $item->attr_title,
+			'description'           => (string) $item->description,
+			'classes'               => $item_classes,
+			'xfn'                   => (string) $item->xfn,
+			'menu_order'            => intval( $item->menu_order ),
+			'parent_id'             => intval( $item->menu_item_parent ),
+			'object_type'           => (string) $item->object,
+			'object_id'             => intval( $item->object_id ),
+			'type'                  => (string) $item->type,
+			'type_label'            => (string) $item->type_label,
+			'status'                => (string) $item->post_status,
+			'invalid'               => ! empty( $item->invalid ),
+			'missing_target_object' => empty( $linked_object['exists'] ),
+			'linked_object'         => $linked_object,
+		);
+	}
+
+	/**
+	 * Resolves the object a nav menu item points to.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param \WP_Post $item Nav menu item post.
+	 * @return array<string, mixed> Linked object payload.
+	 */
+	private function normalize_nav_menu_linked_object( \WP_Post $item ): array {
+		$type      = (string) $item->type;
+		$object    = (string) $item->object;
+		$object_id = intval( $item->object_id );
+
+		if ( 'custom' === $type ) {
+			return array(
+				'kind'   => 'custom',
+				'type'   => 'custom',
+				'id'     => 0,
+				'title'  => (string) $item->title,
+				'status' => '',
+				'url'    => (string) $item->url,
+				'exists' => true,
+			);
+		}
+
+		if ( 'post_type_archive' === $type ) {
+			return array(
+				'kind'   => 'post_type_archive',
+				'type'   => $object,
+				'id'     => 0,
+				'title'  => (string) $item->title,
+				'status' => '',
+				'url'    => get_post_type_archive_link( $object ) ?: (string) $item->url,
+				'exists' => true,
+			);
+		}
+
+		if ( 'taxonomy' === $type ) {
+			$term = get_term( $object_id, $object );
+			if ( $term && ! is_wp_error( $term ) ) {
+				$term_link = get_term_link( $term );
+				return array(
+					'kind'   => 'term',
+					'type'   => (string) $term->taxonomy,
+					'id'     => intval( $term->term_id ),
+					'title'  => (string) $term->name,
+					'status' => '',
+					'url'    => is_wp_error( $term_link ) ? '' : (string) $term_link,
+					'exists' => true,
+				);
+			}
+
+			return array(
+				'kind'   => 'term',
+				'type'   => $object,
+				'id'     => $object_id,
+				'title'  => (string) $item->title,
+				'status' => '',
+				'url'    => (string) $item->url,
+				'exists' => false,
+			);
+		}
+
+		$linked_post = $object_id > 0 ? get_post( $object_id ) : null;
+		if ( $linked_post ) {
+			return array(
+				'kind'   => 'post',
+				'type'   => (string) $linked_post->post_type,
+				'id'     => intval( $linked_post->ID ),
+				'title'  => (string) $linked_post->post_title,
+				'status' => (string) $linked_post->post_status,
+				'url'    => get_permalink( $linked_post->ID ) ?: '',
+				'exists' => true,
+			);
+		}
+
+		return array(
+			'kind'   => 'post',
+			'type'   => $object,
+			'id'     => $object_id,
+			'title'  => (string) $item->title,
+			'status' => '',
+			'url'    => (string) $item->url,
+			'exists' => false,
+		);
+	}
+
+	/**
+	 * Builds a nested menu tree from a flat menu item list.
+	 *
+	 * @since 1.7.5
+	 *
+	 * @param array $items     Flat menu items.
+	 * @param int   $parent_id Parent menu item ID.
+	 * @return array Nested menu items.
+	 */
+	private function nest_nav_menu_items( array $items, int $parent_id = 0 ): array {
+		$branch = array();
+
+		foreach ( $items as $item ) {
+			if ( intval( $item['parent_id'] ?? 0 ) !== $parent_id ) {
+				continue;
+			}
+
+			$item['children'] = $this->nest_nav_menu_items( $items, intval( $item['id'] ?? 0 ) );
+			$branch[]         = $item;
+		}
+
+		return $branch;
 	}
 
 	/**
